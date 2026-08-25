@@ -8,15 +8,83 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
+  source-migration:
+    name: Source-first migration
+    if: ${{ hashFiles('NosAi*.zip') != '' && hashFiles('.source-migrated') == '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Locate release archive
+        id: archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="$(find . -maxdepth 2 -type f -name 'NosAi*.zip' -print -quit)"
+          test -n "$archive"
+          echo "path=$archive" >> "$GITHUB_OUTPUT"
+
+      - name: Extract clean source tree
+        shell: bash
+        env:
+          ARCHIVE: ${{ steps.archive.outputs.path }}
+        run: |
+          set -euo pipefail
+          rm -rf .source-stage
+          mkdir .source-stage
+          unzip -q "$ARCHIVE" -d .source-stage
+          find .source-stage -type d -name '__pycache__' -prune -exec rm -rf {} +
+          find .source-stage -type f -name '*.pyc' -delete
+          test -f .source-stage/setup.py
+          test -d .source-stage/app
+          test -d .source-stage/tests
+
+      - name: Merge source into repository root
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp -a .source-stage/. ./
+          rm -f "${{ steps.archive.outputs.path }}"
+          rm -rf .source-stage
+          touch .source-migrated
+
+      - name: Validate migrated tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f app/m1/world_model/latent.py
+          test -f tests/conftest.py
+          test -f setup.py
+          test -f .source-migrated
+          if find . -type d -name '__pycache__' -not -path './.git/*' | grep -q .; then exit 1; fi
+          if find . -type f -name '*.pyc' -not -path './.git/*' | grep -q .; then exit 1; fi
+
+      - name: Commit source migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m 'feat: migrate NosAi source tree from release archive'
+          git push origin HEAD:${GITHUB_REF_NAME}
+
   baseline-tests:
     name: Baseline regression suite
+    needs: source-migration
+    if: ${{ always() && needs.source-migration.result != 'failure' && needs.source-migration.result != 'cancelled' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -30,49 +98,63 @@ jobs:
           python-version: '3.11'
           cache: pip
 
-      - name: Locate release archive
-        id: archive
+      - name: Select source tree
+        id: source
         shell: bash
         run: |
           set -euo pipefail
-          archive="$(find . -maxdepth 2 -type f -name 'NosAi*.zip' -print -quit)"
-          test -n "$archive"
-          echo "path=$archive" >> "$GITHUB_OUTPUT"
-
-      - name: Extract release archive
-        shell: bash
-        env:
-          ARCHIVE: ${{ steps.archive.outputs.path }}
-        run: |
-          set -euo pipefail
-          rm -rf .ci-runtime
-          mkdir .ci-runtime
-          unzip -q "$ARCHIVE" -d .ci-runtime
-          test -f .ci-runtime/setup.py
-          test -d .ci-runtime/app
-          test -d .ci-runtime/tests
+          if test -f .source-migrated; then
+            echo "workdir=." >> "$GITHUB_OUTPUT"
+          else
+            archive="$(find . -maxdepth 2 -type f -name 'NosAi*.zip' -print -quit)"
+            test -n "$archive"
+            rm -rf .ci-runtime
+            mkdir .ci-runtime
+            unzip -q "$archive" -d .ci-runtime
+            find .ci-runtime -type d -name '__pycache__' -prune -exec rm -rf {} +
+            find .ci-runtime -type f -name '*.pyc' -delete
+            echo "workdir=.ci-runtime" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Install deterministic test environment
-        working-directory: .ci-runtime
+        shell: bash
+        env:
+          WORKDIR: ${{ steps.source.outputs.workdir }}
         run: |
+          set -euo pipefail
+          cd "$WORKDIR"
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install pytest
           python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu 'torch>=2.0'
 
       - name: Verify runtime dependency
-        working-directory: .ci-runtime
+        shell: bash
+        env:
+          WORKDIR: ${{ steps.source.outputs.workdir }}
         run: |
+          set -euo pipefail
+          cd "$WORKDIR"
           python - <<'PY'
           import torch
           import torch.nn as nn
-          print(f"torch={torch.__version__}")
+          print(f'torch={torch.__version__}')
           assert nn.Module is not None
           PY
 
       - name: Compile Python sources
-        working-directory: .ci-runtime
-        run: python -m compileall -q app tests
+        shell: bash
+        env:
+          WORKDIR: ${{ steps.source.outputs.workdir }}
+        run: |
+          set -euo pipefail
+          cd "$WORKDIR"
+          python -m compileall -q app tests
 
       - name: Run regression suite
-        working-directory: .ci-runtime
-        run: python -m pytest -q
+        shell: bash
+        env:
+          WORKDIR: ${{ steps.source.outputs.workdir }}
+        run: |
+          set -euo pipefail
+          cd "$WORKDIR"
+          python -m pytest -q
