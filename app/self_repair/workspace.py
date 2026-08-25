@@ -1,8 +1,4 @@
-"""Safe repository workspace mutations for the repair engine.
-
-The engine may create, modify, or delete files only under an explicit allowlist.
-It always creates a rollback snapshot before mutating the workspace.
-"""
+"""Safe repository workspace mutations for the repair engine."""
 
 from __future__ import annotations
 
@@ -28,7 +24,11 @@ class RepairWorkspace:
         if path.is_absolute() or ".." in path.parts:
             raise WorkspacePolicyError(f"path outside workspace: {relative_path}")
         resolved = (self.root / path).resolve()
-        if not any(resolved == (self.root / allowed).resolve() or (self.root / allowed).resolve() in resolved.parents for allowed in self.allowed_roots):
+        if not any(
+            resolved == (self.root / allowed).resolve()
+            or (self.root / allowed).resolve() in resolved.parents
+            for allowed in self.allowed_roots
+        ):
             raise WorkspacePolicyError(f"path not in allowed roots: {relative_path}")
         return resolved
 
@@ -58,3 +58,15 @@ class RepairWorkspace:
             target.parent.mkdir(parents=True, exist_ok=True)
             target.write_text(op.content, encoding="utf-8")
         return snapshots
+
+    def rollback(self, operations: tuple[FileOperation, ...], run_id: str) -> None:
+        """Restore files touched by a candidate that failed validation."""
+        snapshot_dir = self.snapshot_root / run_id
+        for op in reversed(operations):
+            target = self.resolve(op.path)
+            matches = list(snapshot_dir.glob(f"*-{target.name}")) if snapshot_dir.exists() else []
+            if matches:
+                target.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(matches[-1], target)
+            elif target.exists():
+                target.unlink()
