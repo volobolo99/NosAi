@@ -25,6 +25,7 @@ dev = [
 [project.scripts]
 nosai-preflight = "app.preflight:main"
 nosai-pilot = "app.pilot.cli:main"
+nosai-pilot-cycle = "app.pilot.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["app*"]

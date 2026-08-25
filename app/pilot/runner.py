@@ -21,7 +21,14 @@ class TestPilot:
     This component deliberately has no method that executes an action. It only
     asks the adapter to *validate* a proposed action, preserving the safety
     boundary required before a real client integration exists.
+
+    ``__test__ = False`` is intentional: the production runner is named
+    ``TestPilot`` for domain/API compatibility, but it is not itself a pytest
+    test class. This prevents pytest from attempting to collect it and removes
+    a misleading collection warning during the environment gate.
     """
+
+    __test__ = False
 
     def __init__(
         self,
@@ -29,6 +36,7 @@ class TestPilot:
         config: PilotSessionConfig | None = None,
         decision_fn: DecisionFn | None = None,
     ) -> None:
+        """Validate dependencies and initialize the pilot session components."""
         validate_adapter(adapter)
         self.adapter = adapter
         self.config = config or PilotSessionConfig()
@@ -49,6 +57,7 @@ class TestPilot:
     def _missing_capabilities(
         payload: dict[str, Any], required: tuple[str, ...]
     ) -> tuple[str, ...]:
+        """Return required dotted-path capabilities absent from the state payload."""
         missing: list[str] = []
         for capability in required:
             current: Any = payload
@@ -77,6 +86,7 @@ class TestPilot:
         return StateQuality.DEGRADED
 
     def run(self) -> PilotResult:
+        """Execute the configured safe pilot loop and return collected diagnostics."""
         session_id = uuid.uuid4().hex
         errors: list[PilotError] = []
         latencies: list[float] = []

@@ -1,6 +1,6 @@
-# Optional APIsec security scanning.
-# Enable with repository variable APISEC_ENABLED=true after configuring
-# the APIsec credentials and project.
+# Optional API security scanning workflow.
+# Enable it with repository variable APISEC_ENABLED=true after configuring
+# the APIsec credentials and project in GitHub Actions.
 
 name: APIsec
 
@@ -18,11 +18,13 @@ permissions:
 
 jobs:
   Trigger_APIsec_scan:
+    # Do not run an unconfigured third-party scanner and fail otherwise healthy CI.
     if: ${{ vars.APISEC_ENABLED == 'true' }}
     permissions:
       security-events: write
       actions: read
     runs-on: ubuntu-latest
+
     steps:
       - name: APIsec scan
         uses: apisec-inc/apisec-run-scan@025432089674a28ba8fb55f8ab06c10215e772ea

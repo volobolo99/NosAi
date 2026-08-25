@@ -1,6 +1,5 @@
-# Optional Black Duck security scanning.
-# Enable with repository variable BLACKDUCK_ENABLED=true after configuring
-# the required vendor variables/secrets.
+# This workflow uses actions that are not certified by GitHub.
+# They are provided by a third-party and are governed by separate terms.
 
 name: CI Black Duck security scan
 
@@ -14,6 +13,8 @@ on:
 
 jobs:
   build:
+    # Enable by setting repository variable BLACKDUCK_ENABLED=true.
+    # Without configured vendor credentials, the security scan must not fail CI.
     if: ${{ vars.BLACKDUCK_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -21,6 +22,7 @@ jobs:
       pull-requests: write
       security-events: write
       actions: read
+
     steps:
       - name: Checkout source
         uses: actions/checkout@v4

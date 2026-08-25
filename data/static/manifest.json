@@ -1,7 +1,8 @@
 {
   "schema_version": 1,
   "project": "NosAi",
-  "snapshot_policy": "immutable-runtime",
+  "snapshot_policy": "online-first-immutable-runtime",
+  "source_registry": "data/static/source_registry.json",
   "datasets": {
     "items": {"required": true, "source": null, "version": null, "sha256": null},
     "monsters": {"required": true, "source": null, "version": null, "sha256": null},
