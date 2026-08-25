@@ -10,7 +10,7 @@ import uuid
 from app.client.adapter import ClientAdapter, validate_adapter
 from app.self_repair.telemetry import TelemetryStore
 
-from .models import PilotDecision, PilotError, PilotMode, PilotResult, PilotSessionConfig
+from .models import PilotError, PilotResult, PilotSessionConfig
 
 DecisionFn = Callable[[dict[str, Any]], Any]
 
