@@ -36,6 +36,7 @@ class PilotSessionConfig:
         "target",
     )
     telemetry_path: str = "artifacts/pilot/telemetry.jsonl"
+    event_path: str = "artifacts/pilot/events.jsonl"
 
 
 @dataclass(frozen=True)
