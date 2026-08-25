@@ -2,7 +2,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
-from app.m1.core.types import Action, State
+from app.m1.core.types import Action, State, Prediction
 from app.m2.objective import PlannerObjective
 from app.m2.types import CandidateScore
 
@@ -18,6 +18,7 @@ class _Node:
     uncertainty_sum: float = 0.0
     children: list["_Node"] | None = None
     terminal: bool = False
+    prediction: Prediction | None = None
 
     def __post_init__(self):
         if self.children is None:
@@ -27,8 +28,10 @@ class _Node:
     def value(self):
         return self.value_sum / self.visits if self.visits else 0.0
 
+
 class UncertaintyMCTS:
     """Model-predictive MCTS with uncertainty-aware exploration and risk penalty."""
+
     def __init__(self, world_model, rng_seed: int = 42, exploration: float = 1.4,
                  uncertainty_penalty: float = 0.15, risk_penalty: float = 0.1,
                  objective: PlannerObjective | None = None):
@@ -54,35 +57,62 @@ class UncertaintyMCTS:
             depth = 0
             while node.children and depth < horizon and not node.terminal:
                 node = self._select(node)
-                path.append(node); depth += 1
+                path.append(node)
+                depth += 1
             if depth < horizon and not node.terminal:
                 self._expand(node, actions)
                 if node.children:
                     node = self.rng.choice(node.children)
-                    path.append(node); depth += 1
+                    path.append(node)
+                    depth += 1
             value, risk, uncertainty = self._evaluate_path(path, horizon, value_fn, goal)
             self._backup(path, value, risk, uncertainty)
         best = max(root.children or [], key=lambda n: n.visits)
-        scores = tuple(CandidateScore(n.action, n.value, n.risk_sum/max(n.visits,1),
-                                      n.uncertainty_sum/max(n.visits,1), n.visits)
-                       for n in sorted(root.children, key=lambda n: n.visits, reverse=True))
+        scores = tuple(
+            CandidateScore(
+                n.action,
+                n.value,
+                n.risk_sum / max(n.visits, 1),
+                n.uncertainty_sum / max(n.visits, 1),
+                n.visits,
+            )
+            for n in sorted(root.children, key=lambda n: n.visits, reverse=True)
+        )
         return best.action, scores
 
     def _expand(self, node, actions):
         if node.children:
             return
         for action in actions:
-            p = self.world_model.predict(node.state, action)
-            node.children.append(_Node(p.next_state, node, action, prior=1.0, terminal=p.done_probability >= .999))
+            prediction = self.world_model.predict(node.state, action)
+            node.children.append(
+                _Node(
+                    prediction.next_state,
+                    node,
+                    action,
+                    prior=1.0,
+                    terminal=prediction.done_probability >= .999,
+                    prediction=prediction,
+                )
+            )
 
     def _select(self, node):
-        return max(node.children, key=lambda c: c.value + self.exploration * c.prior * math.sqrt(math.log(max(node.visits,1)+1)/(c.visits+1)))
+        return max(
+            node.children,
+            key=lambda c: c.value
+            + self.exploration * c.prior * math.sqrt(
+                math.log(max(node.visits, 1) + 1) / (c.visits + 1)
+            ),
+        )
 
     def _evaluate_path(self, path, horizon, value_fn, goal=None):
         reward = risk = uncertainty = 0.0
         discount = 1.0
         for node in path[1:]:
-            p = self.world_model.predict(node.parent.state, node.action)
+            p = node.prediction
+            if p is None:
+                p = self.world_model.predict(node.parent.state, node.action)
+                node.prediction = p
             step_uncertainty = 0.0
             try:
                 u = self.world_model.uncertainty(node.parent.state, node.action)
@@ -101,7 +131,7 @@ class UncertaintyMCTS:
             discount *= .99
         if value_fn and path:
             reward += discount * float(value_fn(path[-1].state))
-        return reward - self.uncertainty_penalty*uncertainty - self.risk_penalty*risk, risk, uncertainty
+        return reward - self.uncertainty_penalty * uncertainty - self.risk_penalty * risk, risk, uncertainty
 
     @staticmethod
     def _backup(path, value, risk, uncertainty):
