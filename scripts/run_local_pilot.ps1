@@ -7,13 +7,16 @@ if (-not $python) {
     throw "Python launcher 'py' was not found. Install Python 3.10+ and retry."
 }
 
-& py -3.10 -c "import sys; assert sys.version_info >= (3,10), sys.version"
+# Use the Python launcher default interpreter instead of hard-coding 3.10.
+# The project declares Python >=3.10; this lets an installed compatible
+# interpreter (e.g. 3.14) run the pilot without requiring an extra install.
+& py -c "import sys; assert sys.version_info >= (3,10), sys.version; print('Using Python', sys.version)"
 if ($LASTEXITCODE -ne 0) {
     throw "Python 3.10+ is required."
 }
 
 if (-not (Test-Path ".venv\Scripts\python.exe")) {
-    & py -3.10 -m venv .venv
+    & py -m venv .venv
 }
 
 $venvPython = Join-Path (Get-Location) ".venv\Scripts\python.exe"
