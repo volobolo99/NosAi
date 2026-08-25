@@ -17,7 +17,6 @@ concurrency:
 jobs:
   source-migration:
     name: Source-first migration
-    if: ${{ hashFiles('NosAi*.zip') != '' && hashFiles('.source-migrated') == '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -26,54 +25,36 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Locate release archive
-        id: archive
+      - name: Migrate release archive when needed
         shell: bash
         run: |
           set -euo pipefail
+          if test -f .source-migrated; then
+            echo 'Source migration already completed.'
+            exit 0
+          fi
           archive="$(find . -maxdepth 2 -type f -name 'NosAi*.zip' -print -quit)"
-          test -n "$archive"
-          echo "path=$archive" >> "$GITHUB_OUTPUT"
-
-      - name: Extract clean source tree
-        shell: bash
-        env:
-          ARCHIVE: ${{ steps.archive.outputs.path }}
-        run: |
-          set -euo pipefail
+          if test -z "$archive"; then
+            echo 'No release archive found; nothing to migrate.'
+            exit 0
+          fi
           rm -rf .source-stage
           mkdir .source-stage
-          unzip -q "$ARCHIVE" -d .source-stage
+          unzip -q "$archive" -d .source-stage
           find .source-stage -type d -name '__pycache__' -prune -exec rm -rf {} +
           find .source-stage -type f -name '*.pyc' -delete
           test -f .source-stage/setup.py
           test -d .source-stage/app
           test -d .source-stage/tests
-
-      - name: Merge source into repository root
-        shell: bash
-        run: |
-          set -euo pipefail
           cp -a .source-stage/. ./
-          rm -f "${{ steps.archive.outputs.path }}"
+          rm -f "$archive"
           rm -rf .source-stage
           touch .source-migrated
-
-      - name: Validate migrated tree
-        shell: bash
-        run: |
-          set -euo pipefail
           test -f app/m1/world_model/latent.py
           test -f tests/conftest.py
           test -f setup.py
-          test -f .source-migrated
           if find . -type d -name '__pycache__' -not -path './.git/*' | grep -q .; then exit 1; fi
           if find . -type f -name '*.pyc' -not -path './.git/*' | grep -q .; then exit 1; fi
-
-      - name: Commit source migration
-        shell: bash
-        run: |
-          set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
@@ -84,7 +65,7 @@ jobs:
   baseline-tests:
     name: Baseline regression suite
     needs: source-migration
-    if: ${{ always() && needs.source-migration.result != 'failure' && needs.source-migration.result != 'cancelled' }}
+    if: ${{ always() && needs.source-migration.result == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
