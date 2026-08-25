@@ -1,3 +1,4 @@
+# Canonical CI gate: migration is self-hosted from the release archive, then the migrated root is tested.
 name: CI
 
 on:
