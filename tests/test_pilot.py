@@ -1,12 +1,13 @@
 from pathlib import Path
 
-from app.pilot import PilotMode, PilotSessionConfig, TestPilot
+from app.pilot import PilotMode, PilotSessionConfig, TestPilot as PilotRunner
 from app.pilot.adapters import SimulatedClientAdapter
 
 
 def test_simulation_collects_decisions_without_live_execution(tmp_path: Path) -> None:
+    """Verify simulation produces validated decisions without live execution."""
     adapter = SimulatedClientAdapter()
-    pilot = TestPilot(
+    pilot = PilotRunner(
         adapter,
         PilotSessionConfig(mode=PilotMode.SIMULATION, ticks=5, telemetry_path=str(tmp_path / "pilot.jsonl")),
     )
@@ -25,8 +26,9 @@ def test_simulation_collects_decisions_without_live_execution(tmp_path: Path) ->
 
 
 def test_missing_capability_blocks_decision(tmp_path: Path) -> None:
+    """Verify unsafe missing capabilities prevent the decision stage."""
     adapter = SimulatedClientAdapter(scenario="stale_state")
-    pilot = TestPilot(
+    pilot = PilotRunner(
         adapter,
         PilotSessionConfig(ticks=2, telemetry_path=str(tmp_path / "pilot.jsonl")),
     )
@@ -44,8 +46,9 @@ def test_missing_capability_blocks_decision(tmp_path: Path) -> None:
 
 
 def test_unknown_scenario_becomes_runtime_diagnostic(tmp_path: Path) -> None:
+    """Verify an unsupported simulation scenario becomes a runtime diagnostic."""
     adapter = SimulatedClientAdapter(scenario="unknown")
-    pilot = TestPilot(
+    pilot = PilotRunner(
         adapter,
         PilotSessionConfig(ticks=1, telemetry_path=str(tmp_path / "pilot.jsonl")),
     )
