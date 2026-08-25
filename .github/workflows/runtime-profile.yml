@@ -1,0 +1,43 @@
+name: Runtime profile
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['perf/**']
+
+permissions:
+  contents: read
+
+jobs:
+  profile:
+    name: Deterministic runtime profile
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install runtime dependencies
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install pytest
+          python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu 'torch>=2.0'
+
+      - name: Compile sources
+        run: python -m compileall -q app tests tools
+
+      - name: Run deterministic profile
+        run: python tools/profile_runtime.py --output runtime_profile.json
+
+      - name: Upload profile artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-profile
+          path: runtime_profile.json
+          if-no-files-found: error
