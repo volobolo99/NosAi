@@ -7,6 +7,7 @@ from app.pilot.reporting import result_to_dict, write_html_report, write_json_re
 
 
 def make_result() -> PilotResult:
+    """Build a minimal deterministic pilot result for reporting tests."""
     return PilotResult(
         session_id="test-session",
         mode=PilotMode.SIMULATION,
@@ -22,6 +23,7 @@ def make_result() -> PilotResult:
 
 
 def test_result_to_dict_includes_computed_live_safety_gate() -> None:
+    """Verify serialized results retain the computed live-action safety gate."""
     result = make_result()
 
     data = result_to_dict(result)
@@ -30,6 +32,7 @@ def test_result_to_dict_includes_computed_live_safety_gate() -> None:
 
 
 def test_reports_write_with_computed_live_safety_gate(tmp_path: Path) -> None:
+    """Verify JSON and HTML reports expose the same non-live safety state."""
     result = make_result()
     json_path = write_json_report(result, tmp_path / "report.json")
     html_path = write_html_report(result, tmp_path / "report.html")
