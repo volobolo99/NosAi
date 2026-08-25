@@ -21,7 +21,14 @@ class TestPilot:
     This component deliberately has no method that executes an action. It only
     asks the adapter to *validate* a proposed action, preserving the safety
     boundary required before a real client integration exists.
+
+    ``__test__ = False`` is intentional: the production runner is named
+    ``TestPilot`` for domain/API compatibility, but it is not itself a pytest
+    test class. This prevents pytest from attempting to collect it and removes
+    a misleading collection warning during the environment gate.
     """
+
+    __test__ = False
 
     def __init__(
         self,
