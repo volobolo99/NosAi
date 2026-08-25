@@ -7,6 +7,7 @@ def test_hardware_benchmark_writes_json(tmp_path, monkeypatch):
     assert main() == 0
     assert output.exists()
     text = output.read_text(encoding="utf-8")
-    assert '"schema": 1' in text
+    assert '"schema": 2' in text
     assert '"hardware"' in text
     assert '"benchmark"' in text
+    assert '"workload_wall_time_s"' in text
