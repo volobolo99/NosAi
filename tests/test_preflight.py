@@ -1,3 +1,4 @@
+from app.client import ClientState
 from app.diagnostics import run_preflight
 
 
@@ -5,10 +6,28 @@ class HealthyClient:
     def check_connection(self):
         return True
 
+    def read_state(self):
+        return ClientState(tick=1, payload={"player": {"hp": 100}})
+
+    def validate_action(self, action):
+        return action is None
+
+    def close(self):
+        return None
+
 
 class BrokenClient:
     def check_connection(self):
         raise RuntimeError("client transport unavailable")
+
+    def read_state(self):
+        raise AssertionError("must not read state after connection failure")
+
+    def validate_action(self, action):
+        return False
+
+    def close(self):
+        return None
 
 
 def test_preflight_without_client_is_ready():
@@ -27,6 +46,8 @@ def test_preflight_connected_client_is_ready():
     assert report.status == "READY"
     client = next(c for c in report.checks if c.check_id == "NOSAI-CLIENT-0001")
     assert client.status == "PASS"
+    assert "STATE_READ=tick=1" in client.actual
+    assert "ACTION_VALIDATE=DRY_RUN_OK" in client.actual
 
 
 def test_preflight_client_failure_is_blocking_and_diagnostic():
