@@ -6,6 +6,7 @@ from app.pilot.reporting import write_html_report, write_json_report
 
 
 def test_learning_ledger_accumulates_repeated_errors(tmp_path: Path) -> None:
+    """Verify repeated observations are persisted and counted across writes."""
     errors = [{"error_id": "P001", "category": "perception", "message": "missing state"}]
     ledger = tmp_path / "learning.json"
     update_learning_ledger(errors, "stale_state", ledger)
@@ -15,6 +16,7 @@ def test_learning_ledger_accumulates_repeated_errors(tmp_path: Path) -> None:
 
 
 def test_reports_are_written(tmp_path: Path) -> None:
+    """Verify JSON and HTML reports are created for a pilot result."""
     from app.pilot.adapters import SimulatedClientAdapter
     from app.pilot.models import PilotMode, PilotSessionConfig
     from app.pilot.runner import TestPilot
@@ -28,6 +30,7 @@ def test_reports_are_written(tmp_path: Path) -> None:
 
 
 def test_full_cycle_is_safe_and_persistent(tmp_path: Path) -> None:
+    """Verify the multi-scenario cycle persists artifacts while remaining non-live."""
     result = run_cycle(scenarios=("combat_basic", "stale_state"), ticks=3, output_dir=tmp_path)
     assert result["ready_for_live_action"] is False
     assert Path(result["learning_ledger"]).exists()
