@@ -1,7 +1,7 @@
 """Run a reproducible hardware-aware NosAi benchmark.
 
-The benchmark reports the deterministic workload separately from profiler
-startup/serialization overhead, so optimization decisions use workload time.
+The benchmark reports workload time separately from profiling overhead and
+serializes the profile/report dataclasses into a stable JSON artifact.
 """
 from __future__ import annotations
 
@@ -23,19 +23,20 @@ def main() -> int:
 
     tracemalloc.start()
     started = time.perf_counter()
-    result = profile_benchmark()
+    profile, report = profile_benchmark()
     workload_elapsed = time.perf_counter() - started
     _, peak_python = tracemalloc.get_traced_memory()
     tracemalloc.stop()
 
     payload = {
-        "schema": 2,
+        "schema": 3,
         "hardware": {
             "platform": platform.platform(),
             "cpu_count": os.cpu_count(),
             "python": platform.python_version(),
         },
-        "benchmark": result,
+        "benchmark": report.to_dict(),
+        "profile": profile.to_dict(),
         "measurement": {
             "workload_wall_time_s": workload_elapsed,
             "peak_python_bytes": peak_python,
