@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "cases": [
+    {"case_id": "combat-001", "category": "combat", "state": {"expected_action": "attack"}, "objective": "fight", "expected_action_type": "attack", "expected_valid": true},
+    {"case_id": "navigation-001", "category": "navigation", "state": {"expected_action": "move"}, "objective": "travel", "expected_action_type": "move", "expected_valid": true},
+    {"case_id": "recovery-001", "category": "recovery", "state": {"expected_action": "recover"}, "objective": "recover", "expected_action_type": "recover", "expected_valid": true},
+    {"case_id": "invalid-001", "category": "invalid_state", "state": {"expected_action": "none", "valid": false}, "objective": "stop", "expected_action_type": "none", "expected_valid": false},
+    {"case_id": "ambiguous-001", "category": "ambiguous", "state": {"expected_action": "recover", "fallback": true}, "objective": "resolve uncertainty", "expected_action_type": "recover", "expected_valid": true}
+  ]
+}
