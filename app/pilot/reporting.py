@@ -15,6 +15,11 @@ def result_to_dict(result: PilotResult) -> dict[str, Any]:
     """Return a stable, JSON-serializable result representation."""
     data = asdict(result)
     data["mode"] = result.mode.value
+    # ``ready_for_live_action`` is a computed safety property, not a dataclass
+    # field, so ``asdict`` does not include it. Persist it explicitly so JSON
+    # and HTML reports expose the same safety gate without relying on a missing
+    # dictionary key.
+    data["ready_for_live_action"] = result.ready_for_live_action
     return data
 
 
