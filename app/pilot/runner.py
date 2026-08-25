@@ -10,7 +10,7 @@ import uuid
 from app.client.adapter import ClientAdapter, validate_adapter
 from app.self_repair.telemetry import TelemetryStore
 
-from .models import PilotError, PilotResult, PilotSessionConfig
+from .models import PilotError, PilotResult, PilotSessionConfig, StateQuality
 
 DecisionFn = Callable[[dict[str, Any]], Any]
 
@@ -59,13 +59,32 @@ class TestPilot:
                 current = current[part]
         return tuple(missing)
 
+    @staticmethod
+    def _state_quality(missing: tuple[str, ...], required: tuple[str, ...]) -> StateQuality:
+        """Classify state before the decision engine is allowed to run."""
+
+        if not missing:
+            return StateQuality.VALID
+
+        # Missing structural perception is unsafe for an operational decision.
+        # Any missing required field therefore blocks the decision in v0.1.
+        critical = {"player.position", "entities", "target"}
+        if critical.intersection(missing):
+            return StateQuality.UNUSABLE
+
+        # Non-structural fields are retained as degraded telemetry for future
+        # policy refinement, but are still blocked in this first safety gate.
+        return StateQuality.DEGRADED
+
     def run(self) -> PilotResult:
         session_id = uuid.uuid4().hex
         errors: list[PilotError] = []
         latencies: list[float] = []
         decisions = 0
         valid_decisions = 0
+        blocked_decisions = 0
         missing_seen: set[str] = set()
+        state_quality_counts = {quality.value: 0 for quality in StateQuality}
 
         if not self.adapter.check_connection():
             errors.append(
@@ -73,7 +92,10 @@ class TestPilot:
                     "C001", "client", "critical", "client adapter is not connected", False
                 )
             )
-            return PilotResult(session_id, self.config.mode, 0, 0, 0, tuple(errors), (), None)
+            return PilotResult(
+                session_id, self.config.mode, 0, 0, 0, 0, state_quality_counts,
+                tuple(errors), (), None
+            )
 
         for _ in range(self.config.ticks):
             cycle_id = self.telemetry.start_cycle(
@@ -86,17 +108,42 @@ class TestPilot:
                 payload = state.payload
                 missing = self._missing_capabilities(payload, self.config.required_capabilities)
                 missing_seen.update(missing)
+                quality = self._state_quality(missing, self.config.required_capabilities)
+                state_quality_counts[quality.value] += 1
+
                 if missing:
+                    severity = "error" if quality is StateQuality.UNUSABLE else "warning"
                     error = PilotError(
                         "P001",
                         "perception",
-                        "warning",
+                        severity,
                         "required state capabilities are missing",
                         True,
-                        {"missing_capabilities": missing, "tick": state.tick},
+                        {
+                            "missing_capabilities": missing,
+                            "state_quality": quality.value,
+                            "tick": state.tick,
+                        },
                     )
                     errors.append(error)
                     tick_errors.append(error.error_id)
+
+                if quality is not StateQuality.VALID:
+                    blocked_decisions += 1
+                    self.telemetry.finish_cycle(
+                        cycle_id,
+                        "test_pilot",
+                        "BLOCKED",
+                        (perf_counter() - started) * 1000.0,
+                        {"state_quality": quality.value, "decision_blocked": True},
+                        tuple(tick_errors),
+                        {
+                            "session_id": session_id,
+                            "mode": self.config.mode.value,
+                            "missing_capabilities": missing,
+                        },
+                    )
+                    continue
 
                 decision_started = perf_counter()
                 action = self.decision_fn(payload)
@@ -105,7 +152,6 @@ class TestPilot:
                 decisions += 1
 
                 valid = self.adapter.validate_action(action)
-                reason = None if valid else "adapter rejected proposed action"
                 if valid:
                     valid_decisions += 1
                 else:
@@ -113,7 +159,7 @@ class TestPilot:
                         "A001",
                         "action",
                         "error",
-                        reason or "invalid action",
+                        "adapter rejected proposed action",
                         True,
                         {"action": action, "tick": state.tick},
                     )
@@ -125,7 +171,13 @@ class TestPilot:
                     "test_pilot",
                     "OK" if not tick_errors else "DEGRADED",
                     (perf_counter() - started) * 1000.0,
-                    {"tick": state.tick, "decision_latency_ms": latency_ms, "action_valid": valid},
+                    {
+                        "state_quality": quality.value,
+                        "tick": state.tick,
+                        "decision_latency_ms": latency_ms,
+                        "action_valid": valid,
+                        "decision_blocked": False,
+                    },
                     tuple(tick_errors),
                     {"session_id": session_id, "action": action, "mode": self.config.mode.value},
                 )
@@ -154,6 +206,8 @@ class TestPilot:
             ticks=self.config.ticks,
             decisions=decisions,
             valid_decisions=valid_decisions,
+            blocked_decisions=blocked_decisions,
+            state_quality_counts=state_quality_counts,
             errors=tuple(errors),
             missing_capabilities=tuple(sorted(missing_seen)),
             avg_decision_latency_ms=(sum(latencies) / len(latencies)) if latencies else None,
