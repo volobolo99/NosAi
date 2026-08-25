@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'chore/**', 'feature/**', 'fix/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Source regression gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Validate source tree
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f setup.py
+          test -d app
+          test -d tests
+          test -f app/m1/world_model/latent.py
+          test -z "$(find app tests -type d -name '__pycache__' -print -quit)"
+          test -z "$(find app tests -type f -name '*.pyc' -print -quit)"
+
+      - name: Install deterministic test environment
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install pytest
+          python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu 'torch>=2.0'
+
+      - name: Verify runtime dependency
+        run: |
+          python - <<'PY'
+          import torch
+          import torch.nn as nn
+          print(f"torch={torch.__version__}")
+          assert nn.Module is not None
+          PY
+
+      - name: Compile Python sources
+        run: python -m compileall -q app tests
+
+      - name: Run regression suite
+        run: python -m pytest -q

@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nos-ai-project"
+version = "4.19.2"
+description = "NosAi full-runtime fusion project"
+requires-python = ">=3.10"
+
+[project.optional-dependencies]
+m1-learning = ["torch>=2.0"]
+dev = [
+  "pytest>=8,<9",
+  "ruff>=0.6,<1",
+]
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+exclude = [".git", ".venv", "build", "dist"]
+
+[tool.ruff.lint]
+select = ["E4", "E7", "E9", "F"]

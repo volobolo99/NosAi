@@ -1,0 +1,38 @@
+# NosAi points 25-60 implementation map
+
+- 25 Long-Horizon Strategy -> `app.m8.horizon.LongHorizonStrategy`
+- 26 Online Learning -> `app.m9.continual.ContinualLearningEngine.update`
+- 27 Forgetting Protection -> `prevent_forgetting` / `protect`
+- 28 Knowledge Consolidation -> `consolidate`
+- 29 Curriculum Evolution -> `CurriculumScheduler`
+- 30 Model Rollback -> `rollback`
+- 31 Adversarial Testing -> `RobustnessEngine.adversarial_score`
+- 32 Rare Event Simulation -> `rare_event_score` / `stress`
+- 33 Observation Robustness -> `observation_quality`
+- 34 Failure Prediction -> `predict_failure`
+- 35 Safe Fallback -> `safe_action`
+- 36 Unified Planner -> `UnifiedPlanner.fuse`
+- 37 Meta-Decision -> `MetaDecisionLayer`
+- 38 Adaptive Compute -> `AdaptiveCompute`
+- 39 Multi-source Fusion -> `fuse_layers`
+- 40 Final Action Selection -> `Decision`
+- 41 Decision/Outcome Loop -> `EndToEndLearningLoop`
+- 42 Planner Learning -> `PlannerLearner`
+- 43 World Model Co-Training -> `WorldModelCoTrainer`
+- 44 Meta-Learning -> `MetaLearner`
+- 45 Automatic Weight Optimization -> `WeightOptimizer`
+- 46 Ablation -> `ScientificEvaluator.ablation`
+- 47 Cross-Scenario Evaluation -> `cross_scenario`
+- 48 Multi-Seed Evaluation -> `multi_seed`
+- 49 Regression Database -> `save_regression` / `load_regression`
+- 50 Leaderboard -> `leaderboard`
+- 51 Parallel Simulation -> `ParallelSimulation`
+- 52 Performance Profiling -> `ComputeProfiler`
+- 53 MCTS Compute Scheduling -> `MCTSOptimizer`
+- 54 Memory Index -> `MemoryIndex`
+- 55 End-to-End Performance -> `benchmark` / `profile`
+- 56 Long-Run Gate -> `ReliabilityGate.long_run`
+- 57 Fault Injection -> `fault_injection`
+- 58 Recovery -> `recovery`
+- 59 Reproducibility -> `reproducible` / `deterministic_hash`
+- 60 Final Release Gate -> `full_gate` + full regression/build verification

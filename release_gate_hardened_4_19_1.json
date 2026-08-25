@@ -1,0 +1,63 @@
+{
+  "version": "4.19.1",
+  "release": "hardened-release-gate",
+  "timestamp_utc": "2026-08-25T08:22:48Z",
+  "pytest": {
+    "passed": true,
+    "summary": "154 passed",
+    "output_tail": "........................................................................ [ 46%]\n........................................................................ [ 93%]\n..........                                                               [100%]"
+  },
+  "compileall": true,
+  "hardened_evidence": {
+    "long_run": {
+      "name": "long_run",
+      "passed": true,
+      "iterations": 10000,
+      "failures": 0,
+      "digest_before": "c2d4830b8ade7ec01533bae62f976f40c6e12a274153b17ec3c4fa03172d6591",
+      "digest_after": "c668e0710bff04db5dbaae1f9937cd03fe6540d3b4e5d078b3a9cda07f2802a9",
+      "details": "completed"
+    },
+    "fault_injection": {
+      "name": "fault_injection",
+      "passed": true,
+      "iterations": 1,
+      "failures": 0,
+      "digest_before": "",
+      "digest_after": "",
+      "details": "expected exception caught"
+    },
+    "recovery": {
+      "name": "recovery",
+      "passed": true,
+      "iterations": 1,
+      "failures": 0,
+      "digest_before": "",
+      "digest_after": "",
+      "details": "recovered and validated"
+    },
+    "reproducibility": {
+      "name": "reproducibility",
+      "passed": true,
+      "iterations": 3,
+      "failures": 0,
+      "digest_before": "3732fc676814ffe08b02cd6e7825762c1123f0a40610d70cadb221e5fc64df00",
+      "digest_after": "3732fc676814ffe08b02cd6e7825762c1123f0a40610d70cadb221e5fc64df00",
+      "details": "identical deterministic outputs"
+    },
+    "end_to_end": {
+      "passed": true,
+      "steps": 250
+    }
+  },
+  "hardened_suite_seconds": 0.04226088523864746,
+  "wheel": {
+    "file": "nos_ai_project-4.19.1-py3-none-any.whl",
+    "sha256": "92df3793fb5a825cd0d31378e2b23bb0241bf406e026fd697d7eeb5555dacbd2",
+    "integrity": true,
+    "contains_required": true,
+    "import_pass": true,
+    "members": 90
+  },
+  "release_pass": true
+}
