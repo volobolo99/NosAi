@@ -20,6 +20,9 @@ dev = [
   "numpy>=1.26,<3",
 ]
 
+[project.scripts]
+nosai-preflight = "app.preflight:main"
+
 [tool.setuptools.packages.find]
 include = ["app*"]
 
