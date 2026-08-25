@@ -1,8 +1,7 @@
 """Run a reproducible hardware-aware NosAi benchmark.
 
-The benchmark is intentionally conservative: it measures the deterministic
-runtime workload without requiring CUDA, while collecting CPU/RAM/VRAM data
-when available. Results are written as JSON for before/after comparisons.
+The benchmark reports the deterministic workload separately from profiler
+startup/serialization overhead, so optimization decisions use workload time.
 """
 from __future__ import annotations
 
@@ -25,12 +24,12 @@ def main() -> int:
     tracemalloc.start()
     started = time.perf_counter()
     result = profile_benchmark()
-    elapsed = time.perf_counter() - started
+    workload_elapsed = time.perf_counter() - started
     _, peak_python = tracemalloc.get_traced_memory()
     tracemalloc.stop()
 
     payload = {
-        "schema": 1,
+        "schema": 2,
         "hardware": {
             "platform": platform.platform(),
             "cpu_count": os.cpu_count(),
@@ -38,7 +37,7 @@ def main() -> int:
         },
         "benchmark": result,
         "measurement": {
-            "wall_time_s": elapsed,
+            "workload_wall_time_s": workload_elapsed,
             "peak_python_bytes": peak_python,
         },
     }
