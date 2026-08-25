@@ -1,18 +1,20 @@
-"""Windows observation adapter for a real NosTale client.
+"""Read-only Windows observation adapter for a real NosTale client.
 
-This adapter deliberately stops at observation. It detects the real client
-process/window and exposes a normalized snapshot, but never injects input,
-patches memory, or sends game actions. That keeps the live boundary safe while
-we build and validate perception before enabling control.
+The adapter deliberately stops at observation: it discovers a configured
+NosTale process, resolves its visible top-level window, and exposes normalized
+metadata. It never injects input, patches memory, opens a game-control
+transport, or executes an action.
 """
 from __future__ import annotations
 
+import csv
 import ctypes
 import ctypes.wintypes
 import os
 import subprocess
 import time
 from dataclasses import dataclass
+from io import StringIO
 from typing import Any, Iterable
 
 from app.client.adapter import ClientState
@@ -31,21 +33,43 @@ class WindowInfo:
     right: int
     bottom: int
 
+    @property
+    def width(self) -> int:
+        return max(0, self.right - self.left)
+
+    @property
+    def height(self) -> int:
+        return max(0, self.bottom - self.top)
+
+    @property
+    def area(self) -> int:
+        return self.width * self.height
+
 
 class WindowsNosTaleAdapter:
     """Read-only adapter for a running NosTale Windows client.
 
     Process names are configurable because Gameforge/Steam distributions can
-    differ. The adapter never guesses a process from unrelated windows.
+    differ. A connection is considered valid only when a matching process has
+    a visible window; merely finding a PID is not enough.
     """
 
+    DEFAULT_PROCESS_NAMES = ("NostaleClientX.exe", "NostaleClient.exe")
+
     def __init__(self, process_names: Iterable[str] | None = None) -> None:
-        configured = process_names or os.getenv(
-            "NOSAI_NOSTALE_PROCESS_NAMES", "NostaleClientX.exe;NostaleClient.exe"
-        ).split(";")
-        self._process_names = {name.strip().lower() for name in configured if name.strip()}
+        if process_names is None:
+            configured = os.getenv("NOSAI_NOSTALE_PROCESS_NAMES")
+            names = configured.split(";") if configured else self.DEFAULT_PROCESS_NAMES
+        else:
+            names = process_names
+        self._process_names = {name.strip().lower() for name in names if name.strip()}
         if not self._process_names:
             raise ValueError("at least one NosTale process name is required")
+
+    @property
+    def process_names(self) -> tuple[str, ...]:
+        """Return the normalized process allow-list."""
+        return tuple(sorted(self._process_names))
 
     def _matching_pids(self) -> set[int]:
         if os.name != "nt":
@@ -61,13 +85,17 @@ class WindowsNosTaleAdapter:
             raise NosTaleClientError(f"cannot enumerate Windows processes: {exc}") from exc
 
         pids: set[int] = set()
-        for line in output.splitlines():
-            fields = [field.strip('"') for field in line.split('","')]
-            if len(fields) >= 2 and fields[0].lower() in self._process_names:
+        try:
+            rows = csv.reader(StringIO(output))
+            for fields in rows:
+                if len(fields) < 2 or fields[0].strip().lower() not in self._process_names:
+                    continue
                 try:
-                    pids.add(int(fields[1]))
+                    pids.add(int(fields[1].strip()))
                 except ValueError:
                     continue
+        except csv.Error as exc:
+            raise NosTaleClientError(f"cannot parse tasklist output: {exc}") from exc
         return pids
 
     @staticmethod
@@ -96,10 +124,10 @@ class WindowsNosTaleAdapter:
                 WindowInfo(
                     pid=int(pid.value),
                     title=buffer.value,
-                    left=rect.left,
-                    top=rect.top,
-                    right=rect.right,
-                    bottom=rect.bottom,
+                    left=int(rect.left),
+                    top=int(rect.top),
+                    right=int(rect.right),
+                    bottom=int(rect.bottom),
                 )
             )
             return True
@@ -107,34 +135,46 @@ class WindowsNosTaleAdapter:
         user32.EnumWindows(enum_proc(callback), 0)
         return windows
 
+    def _find_windows(self) -> list[WindowInfo]:
+        return self._windows_for_pids(self._matching_pids())
+
     def check_connection(self) -> bool:
-        return bool(self._windows_for_pids(self._matching_pids()))
+        """Return whether a matching process currently has a visible window."""
+        return bool(self._find_windows())
 
     def read_state(self) -> ClientState:
-        pids = self._matching_pids()
-        windows = self._windows_for_pids(pids)
+        """Return a deterministic, non-invasive snapshot of client metadata."""
+        windows = self._find_windows()
         if not windows:
             raise NosTaleClientError("no visible NosTale client window found")
-        window = windows[0]
+
+        # Prefer the largest visible window. This avoids attaching to a small
+        # launcher/helper window when multiple top-level windows share a PID.
+        window = max(windows, key=lambda item: (item.area, item.width, item.height))
         return ClientState(
             tick=time.monotonic_ns(),
             payload={
                 "source": "windows_observation",
                 "pid": window.pid,
-                "process_names": sorted(self._process_names),
+                "process_names": list(self.process_names),
                 "window_title": window.title,
                 "window_rect": {
                     "left": window.left,
                     "top": window.top,
                     "right": window.right,
                     "bottom": window.bottom,
+                    "width": window.width,
+                    "height": window.height,
                 },
                 "observation_only": True,
+                "action_transport": "disabled",
             },
         )
 
     def validate_action(self, action: Any) -> bool:
+        """Accept only the adapter's explicit no-op validation sentinel."""
         return action is None
 
     def close(self) -> None:
+        """Release adapter resources; observation uses no persistent handles."""
         return None
