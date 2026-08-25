@@ -5,6 +5,7 @@ on:
     branches: [main, 'chore/**', 'feature/**', 'fix/**']
   pull_request:
     branches: [main]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -42,10 +43,20 @@ jobs:
           python -m pip install --upgrade pip setuptools pytest
           python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu 'torch>=2.0'
 
+      - name: Verify PyTorch runtime
+        working-directory: .ci-runtime
+        run: |
+          python - <<'PY'
+          import torch
+          import torch.nn as nn
+          print(f"torch={torch.__version__}")
+          assert nn.Module is not None
+          PY
+
       - name: Compile Python sources
         working-directory: .ci-runtime
         run: python -m compileall -q app tests
 
       - name: Run regression suite
         working-directory: .ci-runtime
-        run: python -m pytest
+        run: python -m pytest -q
