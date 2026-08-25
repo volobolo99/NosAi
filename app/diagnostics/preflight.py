@@ -49,6 +49,8 @@ class PreflightReport:
 
 _DEFAULT_MODULES = (
     "app",
+    "app.client",
+    "app.diagnostics",
     "app.m1",
     "app.m2",
     "app.m3",
@@ -111,15 +113,10 @@ def _check_torch() -> str:
 
 
 def _check_client(adapter: Any) -> str:
-    if adapter is None:
-        return "NOT_CONFIGURED"
-    connect = getattr(adapter, "check_connection", None)
-    if not callable(connect):
-        raise TypeError("client adapter must expose check_connection()")
-    result = connect()
-    if result is not True:
-        raise ConnectionError(f"client connection check returned {result!r}")
-    return "CONNECTED"
+    from app.client.probe import run_client_probe
+
+    probe = run_client_probe(adapter)
+    return ",".join(f"{name}={value}" for name, value in probe)
 
 
 def run_preflight(
@@ -131,9 +128,8 @@ def run_preflight(
 ) -> PreflightReport:
     """Run startup checks without executing game actions.
 
-    A client adapter is deliberately dependency-injected. This keeps the pre-flight
-    system independent from a particular client transport while giving the real
-    integration a strict connection contract.
+    When ``require_client`` is true, the adapter is connected, a normalized state
+    is read, and a dry-run action validation is performed. No game action is sent.
     """
 
     checks: list[CheckResult] = [
@@ -167,11 +163,13 @@ def run_preflight(
 
     client_result = _run_check(
         "NOSAI-CLIENT-0001",
-        "CLIENT_CONNECTION",
+        "CLIENT_INTEGRATION",
         lambda: _check_client(client_adapter),
-        "connected client" if require_client else "client optional",
+        "connected client with readable state and dry-run action validation"
+        if require_client
+        else "client optional",
     )
-    if not require_client and client_result.status == "PASS":
+    if not require_client:
         client_result = CheckResult(
             client_result.check_id,
             client_result.phase,
@@ -181,7 +179,7 @@ def run_preflight(
             "client optional",
             "NOT_CONFIGURED",
         )
-    elif require_client and client_result.status == "FAIL":
+    elif client_result.status == "FAIL":
         client_result = CheckResult(
             client_result.check_id,
             client_result.phase,
