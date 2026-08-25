@@ -45,6 +45,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip setuptools wheel
           python -m pip install pytest
+          python -m pip install 'ruff==0.6.9'
           python -m pip install --extra-index-url https://download.pytorch.org/whl/cpu 'torch>=2.0'
 
       - name: Verify runtime dependency
@@ -55,6 +56,9 @@ jobs:
           print(f"torch={torch.__version__}")
           assert nn.Module is not None
           PY
+
+      - name: Lint Python sources
+        run: python -m ruff check app tests
 
       - name: Compile Python sources
         run: python -m compileall -q app tests
