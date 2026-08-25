@@ -2,7 +2,6 @@ from pathlib import Path
 
 from app.pilot.cycle import run_cycle
 from app.pilot.learning import update_learning_ledger
-from app.pilot.models import PilotError
 from app.pilot.reporting import write_html_report, write_json_report
 
 
