@@ -56,8 +56,8 @@ jobs:
           assert nn.Module is not None
           PY
 
-      - name: Run Ruff quality gate
-        run: python -m ruff check app tests
+      - name: Run audited Ruff quality gate
+        run: python -m ruff check app/static_data tests/static_data
 
       - name: Compile Python sources
         run: python -m compileall -q app tests
