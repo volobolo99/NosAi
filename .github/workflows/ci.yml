@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, 'chore/**', 'feature/**', 'fix/**']
+    branches: [main, 'chore/**', 'feature/**', 'fix/**', 'audit/**']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -34,7 +34,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -f setup.py
+          test -f pyproject.toml
           test -d app
           test -d tests
           test -f app/m1/world_model/latent.py
