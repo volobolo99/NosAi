@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Iterable, Sequence
 
 from app.hardware_profile import detect_hardware
@@ -16,44 +15,47 @@ except ImportError:  # pragma: no cover
     nn = None
 
 
-class _DynamicsNet(nn.Module):
-    """Learnable latent dynamics network."""
+if nn is not None:
 
-    def __init__(
-        self, state_dim: int, action_dim: int, latent_dim: int, hidden: int = 64
-    ) -> None:
-        """Initialize dynamics network."""
-        super().__init__()
-        self.net = nn.Sequential(
-            nn.Linear(latent_dim + action_dim, hidden),
-            nn.Tanh(),
-            nn.Linear(hidden, hidden),
-            nn.Tanh(),
-        )
-        self.next_latent = nn.Linear(hidden, latent_dim)
-        self.reward = nn.Linear(hidden, 1)
-        self.done = nn.Linear(hidden, 1)
-        self.state_head = nn.Linear(latent_dim, state_dim)
+    class _DynamicsNet(nn.Module):
+        """Learnable latent dynamics network."""
 
-    def forward(self, z: torch.Tensor, a: torch.Tensor) -> tuple:
-        """Forward pass: predict next latent, reward, done, and reconstructed state."""
-        h = self.net(torch.cat([z, a], dim=-1))
-        nz = self.next_latent(h)
-        return (
-            nz,
-            self.reward(h).squeeze(-1),
-            self.done(h).squeeze(-1),
-            self.state_head(nz),
-        )
+        def __init__(
+            self, state_dim: int, action_dim: int, latent_dim: int, hidden: int = 64
+        ) -> None:
+            super().__init__()
+            self.net = nn.Sequential(
+                nn.Linear(latent_dim + action_dim, hidden),
+                nn.Tanh(),
+                nn.Linear(hidden, hidden),
+                nn.Tanh(),
+            )
+            self.next_latent = nn.Linear(hidden, latent_dim)
+            self.reward = nn.Linear(hidden, 1)
+            self.done = nn.Linear(hidden, 1)
+            self.state_head = nn.Linear(latent_dim, state_dim)
+
+        def forward(self, z: torch.Tensor, a: torch.Tensor) -> tuple:
+            """Predict next latent, reward, done, and reconstructed state."""
+            h = self.net(torch.cat([z, a], dim=-1))
+            return (
+                self.next_latent(h),
+                self.reward(h).squeeze(-1),
+                self.done(h).squeeze(-1),
+                self.state_head(self.next_latent(h)),
+            )
+
+else:
+
+    class _DynamicsNet:  # pragma: no cover - exercised through dependency error
+        """Import-safe placeholder when PyTorch is unavailable."""
+
+        def __init__(self, *args, **kwargs) -> None:
+            raise RuntimeError("PyTorch is required for the learnable LatentWorldModel")
 
 
 class LatentWorldModel:
-    """Small PyTorch latent dynamics model.
-
-    Online inference is CPU-first because NosAi's control loop uses many tiny,
-    latency-sensitive predictions. Larger training jobs can use CUDA automatically;
-    the trained weights are returned to the online device after each training run.
-    """
+    """Small PyTorch latent dynamics model."""
 
     def __init__(
         self,
@@ -68,7 +70,7 @@ class LatentWorldModel:
         gpu_min_samples: int | None = None,
     ) -> None:
         """Initialize latent world model."""
-        if torch is None:
+        if torch is None or nn is None:
             raise RuntimeError("PyTorch is required for the learnable LatentWorldModel")
         self.state_dim = state_dim
         self.action_dim = action_dim
@@ -87,10 +89,7 @@ class LatentWorldModel:
         if requested_train == "auto":
             requested_train = profile.training_device
         self.training_device = torch.device(requested_train)
-        if (
-            self.training_device.type == "cuda"
-            and not torch.cuda.is_available()
-        ):
+        if self.training_device.type == "cuda" and not torch.cuda.is_available():
             self.training_device = torch.device("cpu")
         self.gpu_min_samples = (
             profile.gpu_training_min_samples
@@ -111,36 +110,26 @@ class LatentWorldModel:
             nn.Tanh(),
             nn.Linear(self.hidden, self.latent_dim),
         )
-        self._net = _DynamicsNet(
-            state_dim, self.action_dim, self.latent_dim, self.hidden
-        )
+        self._net = _DynamicsNet(state_dim, self.action_dim, self.latent_dim, self.hidden)
         self._decoder = nn.Linear(self.latent_dim, state_dim)
         self._encoder.to(self.device)
         self._net.to(self.device)
         self._decoder.to(self.device)
         self._optimizer = torch.optim.Adam(
-            (
-                list(self._encoder.parameters())
-                + list(self._net.parameters())
-                + list(self._decoder.parameters())
-            ),
+            list(self._encoder.parameters())
+            + list(self._net.parameters())
+            + list(self._decoder.parameters()),
             lr=self.lr,
         )
 
     @staticmethod
     def _state_vec(state: State) -> list[float]:
-        """Convert state to feature vector."""
         return [float(x) for x in state.features]
 
     def _action_vec(self, action: Action) -> list[float]:
-        """Convert action to numeric vector.
-
-        Keep action encoding deterministic and compact; numeric delta/reward are useful
-        for the existing sandbox, while the id contributes a stable scalar hash.
-        """
         p = action.parameters
         vals = [
-            ((sum(map(ord, action.id)) % 997) / 997.0),
+            (sum(map(ord, action.id)) % 997) / 997.0,
             float(p.get("delta", 0.0)),
             float(p.get("reward", 0.0)),
         ]
@@ -149,168 +138,102 @@ class LatentWorldModel:
         return vals[: self.action_dim]
 
     def encode(self, state: State) -> LatentState:
-        """Encode state to latent representation."""
         self._ensure(len(self._state_vec(state)))
         with torch.no_grad():
-            z = self._encoder(
-                torch.tensor(
-                    [self._state_vec(state)],
-                    dtype=torch.float32,
-                    device=self.device,
-                )
-            )[0]
+            z = self._encoder(torch.tensor([self._state_vec(state)], dtype=torch.float32, device=self.device))[0]
         return LatentState(tuple(float(x) for x in z.tolist()))
 
     def predict_latent(self, latent: LatentState, action: Action) -> LatentState:
-        """Predict next latent state."""
         self._ensure(self.state_dim or len(latent.vector))
         with torch.no_grad():
-            z = torch.tensor(
-                [latent.vector], dtype=torch.float32, device=self.device
-            )
-            a = torch.tensor(
-                [self._action_vec(action)], dtype=torch.float32, device=self.device
-            )
+            z = torch.tensor([latent.vector], dtype=torch.float32, device=self.device)
+            a = torch.tensor([self._action_vec(action)], dtype=torch.float32, device=self.device)
             nz, _, _, _ = self._net(z, a)
         return LatentState(tuple(float(x) for x in nz[0].tolist()))
 
     def predict_reward(self, latent: LatentState, action: Action) -> float:
-        """Predict reward from latent state."""
         self._ensure(self.state_dim or len(latent.vector))
         with torch.no_grad():
-            z = torch.tensor(
-                [latent.vector], dtype=torch.float32, device=self.device
-            )
-            a = torch.tensor(
-                [self._action_vec(action)], dtype=torch.float32, device=self.device
-            )
-            _, r, _, _ = self._net(z, a)
-        return float(r.item())
+            z = torch.tensor([latent.vector], dtype=torch.float32, device=self.device)
+            a = torch.tensor([self._action_vec(action)], dtype=torch.float32, device=self.device)
+            _, reward, _, _ = self._net(z, a)
+        return float(reward.item())
 
     def predict(self, state: State, action: Action) -> Prediction:
-        """Predict next state, reward, and done flag."""
         self._ensure(len(self._state_vec(state)))
         with torch.no_grad():
-            x = torch.tensor(
-                [self._state_vec(state)], dtype=torch.float32, device=self.device
-            )
+            x = torch.tensor([self._state_vec(state)], dtype=torch.float32, device=self.device)
             z = self._encoder(x)
-            a = torch.tensor(
-                [self._action_vec(action)], dtype=torch.float32, device=self.device
-            )
-            nz, r, d, nx = self._net(z, a)
+            a = torch.tensor([self._action_vec(action)], dtype=torch.float32, device=self.device)
+            _, reward, done, next_state_vec = self._net(z, a)
         next_state = State(
-            tuple(float(v) for v in nx[0].tolist()),
+            tuple(float(v) for v in next_state_vec[0].tolist()),
             state.timestamp + 1,
             state.scenario_id,
             state.metadata,
         )
-        return Prediction(
-            next_state,
-            float(r.item()),
-            float(torch.sigmoid(d).item()),
-            float(r.item()),
-        )
+        reward_value = float(reward.item())
+        return Prediction(next_state, reward_value, float(torch.sigmoid(done).item()), reward_value)
 
-    def rollout_latent(
-        self, latent: LatentState, actions: Sequence[Action]
-    ) -> list[LatentState]:
-        """Rollout latent predictions for a sequence of actions."""
+    def rollout_latent(self, latent: LatentState, actions: Sequence[Action]) -> list[LatentState]:
         out = []
-        z = latent
+        current = latent
         for action in actions:
-            z = self.predict_latent(z, action)
-            out.append(z)
+            current = self.predict_latent(current, action)
+            out.append(current)
         return out
 
-    def rollout(
-        self, state: State, actions: Sequence[Action]
-    ) -> list[Prediction]:
-        """Rollout full predictions for a sequence of actions."""
+    def rollout(self, state: State, actions: Sequence[Action]) -> list[Prediction]:
         out = []
         current = state
         for action in actions:
-            p = self.predict(current, action)
-            out.append(p)
-            current = p.next_state
+            prediction = self.predict(current, action)
+            out.append(prediction)
+            current = prediction.next_state
         return out
 
     def uncertainty(self, state: State, action: Action) -> Uncertainty:
-        """Compute epistemic uncertainty.
-
-        Single-model epistemic uncertainty is not identifiable; use confidence from
-        prediction residual statistics after training.
-        """
         residual = getattr(self, "last_loss", 0.0)
         confidence = 1.0 / (1.0 + max(0.0, residual))
-        return Uncertainty(
-            epistemic=float(residual), aleatoric=0.0, confidence=confidence
-        )
+        return Uncertainty(epistemic=float(residual), aleatoric=0.0, confidence=confidence)
 
-    def train(
-        self, transitions: Iterable, epochs: int = 25, batch_size: int = 32
-    ) -> dict:
-        """Train the latent world model."""
+    def train(self, transitions: Iterable, epochs: int = 25, batch_size: int = 32) -> dict:
         transitions = list(transitions)
         if not transitions:
             raise ValueError("at least one transition is required")
         self._ensure(len(self._state_vec(transitions[0].state)))
         n = len(transitions)
-        compute_device = (
-            self.training_device if n >= self.gpu_min_samples else self.device
-        )
+        compute_device = self.training_device if n >= self.gpu_min_samples else self.device
         self._encoder.to(compute_device)
         self._net.to(compute_device)
         self._decoder.to(compute_device)
         self._optimizer = torch.optim.Adam(
-            (
-                list(self._encoder.parameters())
-                + list(self._net.parameters())
-                + list(self._decoder.parameters())
-            ),
+            list(self._encoder.parameters())
+            + list(self._net.parameters())
+            + list(self._decoder.parameters()),
             lr=self.lr,
         )
         if compute_device.type == "cuda":
             torch.set_float32_matmul_precision("high")
-        x = torch.tensor(
-            [self._state_vec(t.state) for t in transitions],
-            dtype=torch.float32,
-            device=compute_device,
-        )
-        y = torch.tensor(
-            [self._state_vec(t.next_state) for t in transitions],
-            dtype=torch.float32,
-            device=compute_device,
-        )
-        a = torch.tensor(
-            [self._action_vec(t.action) for t in transitions],
-            dtype=torch.float32,
-            device=compute_device,
-        )
-        r = torch.tensor(
-            [float(t.reward) for t in transitions],
-            dtype=torch.float32,
-            device=compute_device,
-        )
-        done = torch.tensor(
-            [float(t.done) for t in transitions],
-            dtype=torch.float32,
-            device=compute_device,
-        )
+        x = torch.tensor([self._state_vec(t.state) for t in transitions], dtype=torch.float32, device=compute_device)
+        y = torch.tensor([self._state_vec(t.next_state) for t in transitions], dtype=torch.float32, device=compute_device)
+        a = torch.tensor([self._action_vec(t.action) for t in transitions], dtype=torch.float32, device=compute_device)
+        r = torch.tensor([float(t.reward) for t in transitions], dtype=torch.float32, device=compute_device)
+        done = torch.tensor([float(t.done) for t in transitions], dtype=torch.float32, device=compute_device)
         final = 0.0
-        g = torch.Generator().manual_seed(self.seed)
+        generator = torch.Generator().manual_seed(self.seed)
         for _ in range(epochs):
-            order = torch.randperm(n, generator=g)
+            order = torch.randperm(n, generator=generator)
             for start in range(0, n, batch_size):
                 idx = order[start : start + batch_size]
                 if compute_device.type == "cuda":
                     idx = idx.to(compute_device)
                 z = self._encoder(x[idx])
-                nz, rp, dp, yp = self._net(z, a[idx])
+                nz, reward_pred, done_pred, next_state_pred = self._net(z, a[idx])
                 loss = (
-                    ((yp - y[idx]) ** 2).mean()
-                    + 0.25 * ((rp - r[idx]) ** 2).mean()
-                    + 0.25 * (torch.sigmoid(dp) - done[idx]).pow(2).mean()
+                    ((next_state_pred - y[idx]) ** 2).mean()
+                    + 0.25 * ((reward_pred - r[idx]) ** 2).mean()
+                    + 0.25 * (torch.sigmoid(done_pred) - done[idx]).pow(2).mean()
                 )
                 self._optimizer.zero_grad()
                 loss.backward()
@@ -321,21 +244,13 @@ class LatentWorldModel:
         self._net.to(self.device)
         self._decoder.to(self.device)
         self._optimizer = torch.optim.Adam(
-            (
-                list(self._encoder.parameters())
-                + list(self._net.parameters())
-                + list(self._decoder.parameters())
-            ),
+            list(self._encoder.parameters())
+            + list(self._net.parameters())
+            + list(self._decoder.parameters()),
             lr=self.lr,
         )
-        return {
-            "loss": final,
-            "epochs": epochs,
-            "samples": n,
-            "training_device": compute_device.type,
-        }
+        return {"loss": final, "epochs": epochs, "samples": n, "training_device": compute_device.type}
 
     @property
     def learnable(self) -> bool:
-        """Whether this model is learnable."""
         return True
