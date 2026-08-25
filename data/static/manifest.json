@@ -1,0 +1,16 @@
+{
+  "schema_version": 1,
+  "project": "NosAi",
+  "snapshot_policy": "immutable-runtime",
+  "datasets": {
+    "items": {"required": true, "source": null, "version": null, "sha256": null},
+    "monsters": {"required": true, "source": null, "version": null, "sha256": null},
+    "npcs": {"required": true, "source": null, "version": null, "sha256": null},
+    "skills": {"required": true, "source": null, "version": null, "sha256": null},
+    "bcards": {"required": true, "source": null, "version": null, "sha256": null},
+    "maps": {"required": true, "source": null, "version": null, "sha256": null},
+    "map_points": {"required": false, "source": null, "version": null, "sha256": null},
+    "quests": {"required": false, "source": null, "version": null, "sha256": null},
+    "localization": {"required": true, "source": null, "version": null, "sha256": null}
+  }
+}
