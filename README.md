@@ -42,7 +42,33 @@ For machine-readable diagnostics:
 nosai-preflight --require-client --json
 ```
 
-The required adapter contract is in `app/client/adapter.py`. The repository does not ship a fake live-client adapter: until a real adapter is supplied, `--require-client` correctly blocks instead of pretending the client is connected.
+## Real NosTale observation adapter
+
+`WindowsNosTaleAdapter` is the first concrete boundary for a real Windows NosTale client. It detects only configured process names (`NostaleClientX.exe` and `NostaleClient.exe` by default), requires a visible client window, and returns normalized PID/window geometry metadata.
+
+The adapter is intentionally **observation-only**. It does not inject keyboard/mouse input, patch memory, open a game-action transport, or execute a game action. This is a hard safety boundary while visual/game-state perception is validated.
+
+You can inspect the client locally with:
+
+```text
+nosai-client-probe
+```
+
+or obtain automation-friendly JSON:
+
+```text
+nosai-client-probe --json
+```
+
+A non-zero exit means the client could not be observed successfully; it does not mean NosAi attempted to control the game. To use custom process names on a local installation:
+
+```text
+set NOSAI_NOSTALE_PROCESS_NAMES=NostaleClientX.exe;NostaleClient.exe
+```
+
+The probe and adapter are safe to run before the full NosTale client-control transport exists.
+
+The required generic adapter contract remains in `app/client/adapter.py`; the repository does not ship a fake live-client adapter.
 
 ## Development principles
 
@@ -58,7 +84,8 @@ The required adapter contract is in `app/client/adapter.py`. The repository does
 1. Repository foundation and quality gates. **Complete.**
 2. Source quality and architecture audit. **In progress.**
 3. Establish the strict live-client adapter and integration contract. **In progress.**
-4. Consolidate proven duplication and dead weight without changing runtime behavior.
-5. Establish benchmark and regression baselines.
-6. Optimize measured bottlenecks.
-7. Release hardening.
+4. Validate real-client observation and visual/game-state perception. **Next.**
+5. Add a separately gated action transport only after observation is proven.
+6. Establish benchmark and regression baselines.
+7. Optimize measured bottlenecks.
+8. Release hardening.
