@@ -36,6 +36,8 @@ def main() -> int:
         "ticks": result.ticks,
         "decisions": result.decisions,
         "valid_decisions": result.valid_decisions,
+        "blocked_decisions": result.blocked_decisions,
+        "state_quality_counts": result.state_quality_counts,
         "missing_capabilities": result.missing_capabilities,
         "avg_decision_latency_ms": result.avg_decision_latency_ms,
         "error_count": len(result.errors),
