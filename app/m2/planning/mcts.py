@@ -2,7 +2,7 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass
-from app.m1.core.types import Action, State, Prediction
+from app.m1.core.types import Action, State, Prediction, Uncertainty
 from app.m2.objective import PlannerObjective
 from app.m2.types import CandidateScore
 
@@ -19,6 +19,7 @@ class _Node:
     children: list["_Node"] | None = None
     terminal: bool = False
     prediction: Prediction | None = None
+    uncertainty: Uncertainty | None = None
 
     def __post_init__(self):
         if self.children is None:
@@ -84,7 +85,12 @@ class UncertaintyMCTS:
         if node.children:
             return
         for action in actions:
-            prediction = self.world_model.predict(node.state, action)
+            evaluate = getattr(self.world_model, "evaluate", None)
+            if evaluate is not None:
+                prediction, uncertainty = evaluate(node.state, action)
+            else:
+                prediction = self.world_model.predict(node.state, action)
+                uncertainty = None
             node.children.append(
                 _Node(
                     prediction.next_state,
@@ -93,6 +99,7 @@ class UncertaintyMCTS:
                     prior=1.0,
                     terminal=prediction.done_probability >= .999,
                     prediction=prediction,
+                    uncertainty=uncertainty,
                 )
             )
 
@@ -113,12 +120,15 @@ class UncertaintyMCTS:
             if p is None:
                 p = self.world_model.predict(node.parent.state, node.action)
                 node.prediction = p
-            step_uncertainty = 0.0
-            try:
-                u = self.world_model.uncertainty(node.parent.state, node.action)
-                step_uncertainty = max(0.0, u.epistemic + u.aleatoric + u.ood + u.shift)
-            except AttributeError:
-                step_uncertainty = 0.0
+            u = node.uncertainty
+            if u is None:
+                try:
+                    u = self.world_model.uncertainty(node.parent.state, node.action)
+                except AttributeError:
+                    u = None
+            step_uncertainty = 0.0 if u is None else max(
+                0.0, u.epistemic + u.aleatoric + u.ood + u.shift
+            )
             uncertainty += discount * step_uncertainty
             action_risk = self.objective.action_risk(node.action)
             # Environment-exposed action risk is aligned with terminal/model risk
