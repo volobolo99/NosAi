@@ -1,82 +1,17 @@
 name: Source migration
 
 on:
-  push:
-    branches: ['chore/repository-foundation']
   workflow_dispatch:
 
 permissions:
   contents: write
 
-concurrency:
-  group: source-migration-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   migrate:
-    if: ${{ !hashFiles('.source-migrated') }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Locate archive
-        id: archive
-        shell: bash
-        run: |
-          set -euo pipefail
-          archive="$(find . -maxdepth 2 -type f -name 'NosAi*.zip' -print -quit)"
-          test -n "$archive"
-          echo "path=$archive" >> "$GITHUB_OUTPUT"
-
-      - name: Extract clean source tree
-        shell: bash
-        env:
-          ARCHIVE: ${{ steps.archive.outputs.path }}
-        run: |
-          set -euo pipefail
-          rm -rf .source-stage
-          mkdir .source-stage
-          unzip -q "$ARCHIVE" -d .source-stage
-          find .source-stage -type d -name '__pycache__' -prune -exec rm -rf {} +
-          find .source-stage -type f -name '*.pyc' -delete
-          test -d .source-stage/app
-          test -d .source-stage/tests
-
-      - name: Merge source into repository root
-        shell: bash
-        run: |
-          set -euo pipefail
-          rsync -a --delete --exclude='.git/' --exclude='.github/' --exclude='.source-stage/' .source-stage/ ./
-          rm -f "${{ steps.archive.outputs.path }}"
-          rm -rf .source-stage
-          touch .source-migrated
-
-      - name: Validate migrated tree
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -f app/m1/world_model/latent.py
-          test -f tests/conftest.py
-          test -f setup.py
-          test -f .source-migrated
-          python - <<'PY'
-          import pathlib
-          files = [p for p in pathlib.Path('.').rglob('*') if p.is_file() and '.git' not in p.parts]
-          assert not any('__pycache__' in p.parts or p.suffix == '.pyc' for p in files)
-          print(f'migrated_files={len(files)}')
-          PY
-
-      - name: Commit migration
-        shell: bash
-        run: |
-          set -euo pipefail
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A
-          git diff --cached --quiet && exit 0
-          git commit -m 'feat: migrate NosAi source tree from release archive'
-          git push origin HEAD:chore/repository-foundation
+      - name: Explain canonical migration path
+        run: echo 'Canonical source migration is performed by CI on push; this workflow is manual-only.'
