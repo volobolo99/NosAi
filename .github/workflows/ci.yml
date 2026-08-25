@@ -51,10 +51,14 @@ jobs:
           rm -rf .source-stage
           touch .source-migrated
           test -f app/m1/world_model/latent.py
-          test -f tests/conftest.py
           test -f setup.py
-          test -z "$(find . -type d -name '__pycache__' -not -path './.git/*' -print -quit)"
-          test -z "$(find . -type f -name '*.pyc' -not -path './.git/*' -print -quit)"
+          test -d app
+          test -d tests
+          test -z "$(find app tests -type d -name '__pycache__' -print -quit)"
+          test -z "$(find app tests -type f -name '*.pyc' -print -quit)"
+          source_count="$(find app tests -type f | wc -l)"
+          test "$source_count" -ge 150
+          echo "migrated_source_files=$source_count"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
