@@ -4,7 +4,7 @@ from app.benchmark.runtime_profile import profile_benchmark
 
 def test_runtime_profile_uses_benchmark_path_and_reports_hardware():
     profile, report = profile_benchmark(
-        BenchmarkConfig(episodes=1, max_steps=2, simulations=2, horizon=1),
+        BenchmarkConfig(name="runtime-profile", episodes=1, max_steps=2, simulations=2, horizon=1),
         levels=("baseline", "m4"),
         top_functions=3,
     )
