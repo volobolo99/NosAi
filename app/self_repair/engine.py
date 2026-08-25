@@ -2,7 +2,7 @@
 
 A resolver supplies hypotheses; this module never executes arbitrary model output.
 Only structured file operations under the workspace allowlist can be applied, and
-only after validation demonstrates a measurable improvement.
+only after strict validation demonstrates a measurable improvement.
 """
 
 from __future__ import annotations
@@ -22,13 +22,24 @@ CandidateResolver = Callable[[ErrorEvent, RepairWorkspace], Sequence[RepairCandi
 
 @dataclass(frozen=True)
 class RepairPolicy:
-    min_confidence: float = 0.80
-    min_score: float = 0.20
-    min_validation_score: float = 0.80
-    max_risk: float = 0.35
+    """Maximum-severity repair policy.
+
+    A repair is accepted only when every local quality gate passes. Remote
+    CodeQL/SonarCloud gates are enforced by CI before the change is considered
+    releasable; they are deliberately not faked as local checks.
+    """
+
+    min_confidence: float = 0.95
+    min_score: float = 0.50
+    min_validation_score: float = 1.0
+    max_risk: float = 0.10
     allow_delete: bool = False
     allow_main_workspace: bool = True
-    test_command: tuple[str, ...] = ("python", "-m", "pytest", "-q")
+    test_commands: tuple[tuple[str, ...], ...] = (
+        ("python", "-m", "compileall", "-q", "app", "tests"),
+        ("ruff", "check", "app", "tests"),
+        ("python", "-m", "pytest", "-q"),
+    )
 
 
 class RepairEngine:
@@ -43,7 +54,7 @@ class RepairEngine:
         candidates = [c for c in resolver(event, self.workspace) if self._eligible(c)]
         candidates.sort(key=lambda c: c.score, reverse=True)
         if not candidates:
-            result = RepairResult(event.error_id, "BLOCKED", None, None, "no candidate met the repair policy")
+            result = RepairResult(event.error_id, "BLOCKED", None, None, "no candidate met the maximum-severity repair policy")
             self.journal.record("repair_result", result)
             return result
 
@@ -53,7 +64,7 @@ class RepairEngine:
         mutated = False
         try:
             if any(op.operation == "delete" for op in candidate.operations) and not self.policy.allow_delete:
-                raise WorkspacePolicyError("delete operations are disabled by policy")
+                raise WorkspacePolicyError("delete operations are disabled by maximum-severity policy")
             self.workspace.apply(candidate.operations, run_id)
             mutated = True
             validation = self._validate()
@@ -66,9 +77,9 @@ class RepairEngine:
 
         if not validation.passed or validation.score < self.policy.min_validation_score:
             self.workspace.rollback(candidate.operations, run_id)
-            result = RepairResult(event.error_id, "REJECTED", candidate.candidate_id, validation, "validation did not prove sufficient improvement; changes rolled back")
+            result = RepairResult(event.error_id, "REJECTED", candidate.candidate_id, validation, "strict validation did not prove the repair; changes rolled back")
         else:
-            result = RepairResult(event.error_id, "APPLIED", candidate.candidate_id, validation, "candidate applied and validation passed")
+            result = RepairResult(event.error_id, "APPLIED", candidate.candidate_id, validation, "all local quality gates passed")
         self.journal.record("repair_result", result)
         return result
 
@@ -81,16 +92,23 @@ class RepairEngine:
         )
 
     def _validate(self) -> ValidationResult:
+        outputs: list[str] = []
+        passed_count = 0
         try:
-            completed = subprocess.run(
-                self.policy.test_command,
-                cwd=self.root,
-                text=True,
-                capture_output=True,
-                timeout=300,
-                check=False,
-            )
+            for command in self.policy.test_commands:
+                completed = subprocess.run(
+                    command,
+                    cwd=self.root,
+                    text=True,
+                    capture_output=True,
+                    timeout=300,
+                    check=False,
+                )
+                output = completed.stdout + completed.stderr
+                outputs.append(f"$ {' '.join(command)}\n{output}")
+                if completed.returncode != 0:
+                    return ValidationResult(False, 0.0, passed_count, len(self.policy.test_commands) - passed_count, "\n".join(outputs))
+                passed_count += 1
         except (OSError, subprocess.SubprocessError) as exc:
-            return ValidationResult(False, 0.0, 0, 0, f"validation infrastructure error: {type(exc).__name__}: {exc}")
-        passed = completed.returncode == 0
-        return ValidationResult(passed, 1.0 if passed else 0.0, 1 if passed else 0, 0 if passed else 1, completed.stdout + completed.stderr)
+            return ValidationResult(False, 0.0, passed_count, len(self.policy.test_commands) - passed_count, f"validation infrastructure error: {type(exc).__name__}: {exc}\n" + "\n".join(outputs))
+        return ValidationResult(True, 1.0, passed_count, 0, "\n".join(outputs))
