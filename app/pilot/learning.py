@@ -28,6 +28,7 @@ class LearningRecord:
 
 
 def _utc_now() -> str:
+    """Return the current UTC timestamp in ISO-8601 form."""
     return datetime.now(timezone.utc).isoformat()
 
 
