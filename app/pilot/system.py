@@ -28,6 +28,7 @@ def collect_system_profile() -> dict[str, Any]:
 
 
 def write_system_profile(profile: dict[str, Any], path: str | Path) -> Path:
+    """Serialize a runtime profile to the requested diagnostic artifact path."""
     target = Path(path)
     target.parent.mkdir(parents=True, exist_ok=True)
     target.write_text(json.dumps(profile, indent=2, sort_keys=True), encoding="utf-8")
