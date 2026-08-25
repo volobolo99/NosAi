@@ -36,6 +36,7 @@ class TestPilot:
         config: PilotSessionConfig | None = None,
         decision_fn: DecisionFn | None = None,
     ) -> None:
+        """Validate dependencies and initialize the pilot session components."""
         validate_adapter(adapter)
         self.adapter = adapter
         self.config = config or PilotSessionConfig()
@@ -56,6 +57,7 @@ class TestPilot:
     def _missing_capabilities(
         payload: dict[str, Any], required: tuple[str, ...]
     ) -> tuple[str, ...]:
+        """Return required dotted-path capabilities absent from the state payload."""
         missing: list[str] = []
         for capability in required:
             current: Any = payload
@@ -84,6 +86,7 @@ class TestPilot:
         return StateQuality.DEGRADED
 
     def run(self) -> PilotResult:
+        """Execute the configured safe pilot loop and return collected diagnostics."""
         session_id = uuid.uuid4().hex
         errors: list[PilotError] = []
         latencies: list[float] = []
