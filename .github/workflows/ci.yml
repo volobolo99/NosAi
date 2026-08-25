@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main, 'chore/**', 'feature/**', 'fix/**']
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  baseline-tests:
+    name: Baseline regression suite
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Extract release archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf .ci-runtime
+          mkdir .ci-runtime
+          unzip -q NosAi_v4_19.2_FULL_RUNTIME_FUSION.zip -d .ci-runtime
+          test -f .ci-runtime/setup.py
+          test -d .ci-runtime/app
+          test -d .ci-runtime/tests
+
+      - name: Install test dependencies
+        run: python -m pip install --upgrade pip pytest setuptools
+
+      - name: Compile Python sources
+        working-directory: .ci-runtime
+        run: python -m compileall -q app tests
+
+      - name: Run regression suite
+        working-directory: .ci-runtime
+        run: python -m pytest
