@@ -8,6 +8,7 @@ we build and validate perception before enabling control.
 from __future__ import annotations
 
 import ctypes
+import ctypes.wintypes
 import os
 import subprocess
 import time
@@ -133,9 +134,7 @@ class WindowsNosTaleAdapter:
         )
 
     def validate_action(self, action: Any) -> bool:
-        # No game action is accepted yet. None is the explicit dry-run token.
         return action is None
 
     def close(self) -> None:
-        # No handles or injected resources are retained by this adapter.
         return None
