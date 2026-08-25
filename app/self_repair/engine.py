@@ -50,18 +50,23 @@ class RepairEngine:
         candidate = candidates[0]
         self.journal.record("candidate", candidate)
         run_id = f"{event.error_id}-{uuid.uuid4().hex[:10]}"
+        mutated = False
         try:
             if any(op.operation == "delete" for op in candidate.operations) and not self.policy.allow_delete:
                 raise WorkspacePolicyError("delete operations are disabled by policy")
             self.workspace.apply(candidate.operations, run_id)
+            mutated = True
             validation = self._validate()
         except (OSError, WorkspacePolicyError, subprocess.SubprocessError) as exc:
+            if mutated:
+                self.workspace.rollback(candidate.operations, run_id)
             result = RepairResult(event.error_id, "FAILED", candidate.candidate_id, None, f"repair failed: {type(exc).__name__}: {exc}")
             self.journal.record("repair_result", result)
             return result
 
         if not validation.passed or validation.score < self.policy.min_validation_score:
-            result = RepairResult(event.error_id, "REJECTED", candidate.candidate_id, validation, "validation did not prove sufficient improvement")
+            self.workspace.rollback(candidate.operations, run_id)
+            result = RepairResult(event.error_id, "REJECTED", candidate.candidate_id, validation, "validation did not prove sufficient improvement; changes rolled back")
         else:
             result = RepairResult(event.error_id, "APPLIED", candidate.candidate_id, validation, "candidate applied and validation passed")
         self.journal.record("repair_result", result)
