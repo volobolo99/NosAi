@@ -36,14 +36,14 @@ def test_mcts_reuses_expansion_predictions():
 
         def predict(self, s, a):
             self.predict_calls += 1
-            return super().predict(s, a)
+            p = super().predict(s, a)
+            return Prediction(p.next_state, p.reward, 1.0, p.value)
 
     wm = CountingWM()
     UncertaintyMCTS(wm, rng_seed=1).search(State((0.,)), actions(), simulations=8, horizon=2)
-    # Each node prediction is computed once during expansion and then reused by evaluation.
-    # The exact count depends on tree shape, but it must remain far below the old
-    # expansion+evaluation double-call pattern for the same path.
-    assert wm.predict_calls < 16
+    # Terminal children prevent deeper expansion. Both root actions are predicted once
+    # and the cached predictions are reused by all eight path evaluations.
+    assert wm.predict_calls == len(actions())
 
 
 def test_counterfactual():
