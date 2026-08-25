@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Iterable, Sequence
 
+from app.hardware_profile import detect_hardware
 from ..core.types import LatentState, Prediction, State, Action, Uncertainty
 
 try:
@@ -34,12 +35,14 @@ class _DynamicsNet(nn.Module):
 class LatentWorldModel:
     """Small PyTorch latent dynamics model.
 
-    It learns next latent state, reward and terminal probability from transitions.
-    The public API remains compatible with the original M1 backend.
+    Online inference is CPU-first because NosAi's control loop uses many tiny,
+    latency-sensitive predictions. Larger training jobs can use CUDA automatically;
+    the trained weights are returned to the online device after each training run.
     """
     def __init__(self, state_dim: int | None = None, action_dim: int = 3,
                  latent_dim: int = 8, hidden: int = 64, seed: int = 42, lr: float = 1e-3,
-                 device: str | None = None):
+                 device: str | None = None, train_device: str | None = None,
+                 gpu_min_samples: int | None = None):
         if torch is None:
             raise RuntimeError("PyTorch is required for the learnable LatentWorldModel")
         self.state_dim = state_dim
@@ -48,12 +51,22 @@ class LatentWorldModel:
         self.hidden = hidden
         self.seed = seed
         self.lr = lr
-        requested = device or "auto"
+        profile = detect_hardware()
+        requested = device or profile.online_device
         if requested == "auto":
-            requested = "cuda" if torch.cuda.is_available() else "cpu"
+            requested = profile.online_device
         self.device = torch.device(requested)
         if self.device.type == "cuda" and not torch.cuda.is_available():
             raise RuntimeError("CUDA device requested but CUDA is unavailable")
+        requested_train = train_device or profile.training_device
+        if requested_train == "auto":
+            requested_train = profile.training_device
+        self.training_device = torch.device(requested_train)
+        if self.training_device.type == "cuda" and not torch.cuda.is_available():
+            self.training_device = torch.device("cpu")
+        self.gpu_min_samples = (
+            profile.gpu_training_min_samples if gpu_min_samples is None else max(1, int(gpu_min_samples))
+        )
         self._net = None
         self._optimizer = None
 
@@ -62,11 +75,16 @@ class LatentWorldModel:
             return
         torch.manual_seed(self.seed)
         self.state_dim = state_dim
-        self._encoder = nn.Sequential(nn.Linear(state_dim, self.hidden), nn.Tanh(), nn.Linear(self.hidden, self.latent_dim))
+        self._encoder = nn.Sequential(
+            nn.Linear(state_dim, self.hidden), nn.Tanh(), nn.Linear(self.hidden, self.latent_dim)
+        )
         self._net = _DynamicsNet(state_dim, self.action_dim, self.latent_dim, self.hidden)
         self._decoder = nn.Linear(self.latent_dim, state_dim)
         self._encoder.to(self.device); self._net.to(self.device); self._decoder.to(self.device)
-        self._optimizer = torch.optim.Adam(list(self._encoder.parameters()) + list(self._net.parameters()) + list(self._decoder.parameters()), lr=self.lr)
+        self._optimizer = torch.optim.Adam(
+            list(self._encoder.parameters()) + list(self._net.parameters()) + list(self._decoder.parameters()),
+            lr=self.lr,
+        )
 
     @staticmethod
     def _state_vec(state: State):
@@ -114,15 +132,15 @@ class LatentWorldModel:
         return Prediction(next_state, float(r.item()), float(torch.sigmoid(d).item()), float(r.item()))
 
     def rollout_latent(self, latent: LatentState, actions: Sequence[Action]):
-        out=[]; z=latent
+        out = []; z = latent
         for action in actions:
-            z=self.predict_latent(z, action); out.append(z)
+            z = self.predict_latent(z, action); out.append(z)
         return out
 
     def rollout(self, state: State, actions: Sequence[Action]):
-        out=[]; current=state
+        out = []; current = state
         for action in actions:
-            p=self.predict(current, action); out.append(p); current=p.next_state
+            p = self.predict(current, action); out.append(p); current = p.next_state
         return out
 
     def uncertainty(self, state: State, action: Action) -> Uncertainty:
@@ -133,27 +151,47 @@ class LatentWorldModel:
         return Uncertainty(epistemic=float(residual), aleatoric=0.0, confidence=confidence)
 
     def train(self, transitions: Iterable, epochs: int = 25, batch_size: int = 32) -> dict:
-        transitions=list(transitions)
+        transitions = list(transitions)
         if not transitions:
             raise ValueError("at least one transition is required")
         self._ensure(len(self._state_vec(transitions[0].state)))
-        x=torch.tensor([self._state_vec(t.state) for t in transitions], dtype=torch.float32, device=self.device)
-        y=torch.tensor([self._state_vec(t.next_state) for t in transitions], dtype=torch.float32, device=self.device)
-        a=torch.tensor([self._action_vec(t.action) for t in transitions], dtype=torch.float32, device=self.device)
-        r=torch.tensor([float(t.reward) for t in transitions], dtype=torch.float32, device=self.device)
-        done=torch.tensor([float(t.done) for t in transitions], dtype=torch.float32, device=self.device)
-        n=len(transitions); final=0.0
-        g=torch.Generator().manual_seed(self.seed)
+        n = len(transitions)
+        compute_device = self.training_device if n >= self.gpu_min_samples else self.device
+        self._encoder.to(compute_device); self._net.to(compute_device); self._decoder.to(compute_device)
+        self._optimizer = torch.optim.Adam(
+            list(self._encoder.parameters()) + list(self._net.parameters()) + list(self._decoder.parameters()),
+            lr=self.lr,
+        )
+        if compute_device.type == "cuda":
+            torch.set_float32_matmul_precision("high")
+        x = torch.tensor([self._state_vec(t.state) for t in transitions], dtype=torch.float32, device=compute_device)
+        y = torch.tensor([self._state_vec(t.next_state) for t in transitions], dtype=torch.float32, device=compute_device)
+        a = torch.tensor([self._action_vec(t.action) for t in transitions], dtype=torch.float32, device=compute_device)
+        r = torch.tensor([float(t.reward) for t in transitions], dtype=torch.float32, device=compute_device)
+        done = torch.tensor([float(t.done) for t in transitions], dtype=torch.float32, device=compute_device)
+        final = 0.0
+        g = torch.Generator().manual_seed(self.seed)
         for _ in range(epochs):
-            order=torch.randperm(n, generator=g)
-            for start in range(0,n,batch_size):
-                idx=order[start:start+batch_size]
-                z=self._encoder(x[idx])
-                nz, rp, dp, yp=self._net(z,a[idx])
-                loss=((yp-y[idx])**2).mean() + 0.25*((rp-r[idx])**2).mean() + 0.25*(torch.sigmoid(dp)-done[idx]).pow(2).mean()
-                self._optimizer.zero_grad(); loss.backward(); self._optimizer.step(); final=float(loss.item())
-        self.last_loss=final
-        return {"loss": final, "epochs": epochs, "samples": n}
+            order = torch.randperm(n, generator=g)
+            for start in range(0, n, batch_size):
+                idx = order[start:start + batch_size]
+                if compute_device.type == "cuda":
+                    idx = idx.to(compute_device)
+                z = self._encoder(x[idx])
+                nz, rp, dp, yp = self._net(z, a[idx])
+                loss = (
+                    ((yp - y[idx]) ** 2).mean()
+                    + 0.25 * ((rp - r[idx]) ** 2).mean()
+                    + 0.25 * (torch.sigmoid(dp) - done[idx]).pow(2).mean()
+                )
+                self._optimizer.zero_grad(); loss.backward(); self._optimizer.step(); final = float(loss.item())
+        self.last_loss = final
+        self._encoder.to(self.device); self._net.to(self.device); self._decoder.to(self.device)
+        self._optimizer = torch.optim.Adam(
+            list(self._encoder.parameters()) + list(self._net.parameters()) + list(self._decoder.parameters()),
+            lr=self.lr,
+        )
+        return {"loss": final, "epochs": epochs, "samples": n, "training_device": compute_device.type}
 
     @property
     def learnable(self):
