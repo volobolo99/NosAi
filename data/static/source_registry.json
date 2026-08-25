@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "project": "NosAi",
+  "policy": {
+    "selection": "prefer-highest-authority-and-freshness",
+    "runtime_network": false,
+    "snapshot_required": true,
+    "never_synthesize_missing_game_data": true
+  },
+  "source_tiers": [
+    {
+      "id": "local_client",
+      "priority": 100,
+      "kind": "client_extraction",
+      "description": "Current NosTale client data supplied by the user machine; preferred for version-accurate game data."
+    },
+    {
+      "id": "official_online",
+      "priority": 90,
+      "kind": "official_web_or_api",
+      "description": "Official or first-party online documentation/API when a machine-readable endpoint is available."
+    },
+    {
+      "id": "community_api",
+      "priority": 70,
+      "kind": "community_api",
+      "description": "Public community APIs/providers with explicit provenance and version metadata."
+    },
+    {
+      "id": "community_repository",
+      "priority": 50,
+      "kind": "community_repository",
+      "description": "Public community repositories used only as versioned fallback/reference data."
+    },
+    {
+      "id": "documentation",
+      "priority": 30,
+      "kind": "documentation",
+      "description": "Human-readable technical references used for schema/semantics, never as a silent replacement for missing authoritative records."
+    }
+  ],
+  "verified_sources": [
+    {
+      "id": "nosdata",
+      "tier": "community_api",
+      "url": "https://github.com/imxeno/nosdata",
+      "license": "AGPL-3.0",
+      "status": "reference/provider",
+      "notes": "Public NosTale data-provider project. Endpoint availability must be discovered/configured before use; do not invent API URLs."
+    },
+    {
+      "id": "taletool",
+      "tier": "community_repository",
+      "url": "https://github.com/imxeno/taletool",
+      "license": "see repository",
+      "status": "client-data-extraction-tool",
+      "notes": "Supports inspection/unpacking of NosTale client data containers and recognized NSgtdData records."
+    },
+    {
+      "id": "nostale_research",
+      "tier": "documentation",
+      "url": "https://nt-research.github.io/docs/",
+      "license": "see site",
+      "status": "schema/reference",
+      "notes": "Technical reference for NosTale data-file formats; use for validation and field semantics."
+    },
+    {
+      "id": "noswings_parsing_archive",
+      "tier": "community_repository",
+      "url": "https://github.com/NosWings/ON.NosWings.Parsing",
+      "license": "see repository",
+      "status": "legacy-fallback-only",
+      "notes": "Archived historical data. Never treat it as current live-game truth; use only when explicitly versioned and marked as legacy."
+    }
+  ]
+}
