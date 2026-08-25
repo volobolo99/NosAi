@@ -6,6 +6,7 @@ from app.self_repair.models import FileOperation
 
 
 def candidate(event_id: str, operation: FileOperation, *, confidence: float = 0.95, risk: float = 0.05) -> RepairCandidate:
+    """Build a deterministic repair candidate for policy and rollback tests."""
     return RepairCandidate(
         candidate_id="candidate-1",
         error_id=event_id,
@@ -18,6 +19,7 @@ def candidate(event_id: str, operation: FileOperation, *, confidence: float = 0.
 
 
 def test_workspace_blocks_path_escape(tmp_path: Path) -> None:
+    """Verify repair operations cannot escape the controlled workspace."""
     engine = RepairEngine(tmp_path, RepairJournal(tmp_path / "events.jsonl"))
     event = ErrorEvent("ERR-1", "TEST", "x", "failure")
     operation = FileOperation("create", "../escape.txt", "bad")
@@ -28,6 +30,7 @@ def test_workspace_blocks_path_escape(tmp_path: Path) -> None:
 
 
 def test_rejected_candidate_is_rolled_back(tmp_path: Path) -> None:
+    """Verify a candidate that fails its regression command is rolled back."""
     target = tmp_path / "app"
     target.mkdir()
     file_path = target / "state.txt"
@@ -44,6 +47,7 @@ def test_rejected_candidate_is_rolled_back(tmp_path: Path) -> None:
 
 
 def test_delete_requires_explicit_policy(tmp_path: Path) -> None:
+    """Verify destructive repair operations require explicit policy approval."""
     target = tmp_path / "app"
     target.mkdir()
     file_path = target / "remove.txt"
@@ -58,6 +62,7 @@ def test_delete_requires_explicit_policy(tmp_path: Path) -> None:
 
 
 def test_low_confidence_candidate_is_blocked(tmp_path: Path) -> None:
+    """Verify low-confidence repairs are rejected before application."""
     engine = RepairEngine(tmp_path, RepairJournal(tmp_path / "events.jsonl"))
     event = ErrorEvent("ERR-4", "TEST", "x", "failure")
     operation = FileOperation("create", "app/new.txt", "x")
