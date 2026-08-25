@@ -13,6 +13,7 @@ class Fetcher(Protocol):
 @dataclass(frozen=True)
 class ProviderConfig:
     timeout_seconds: float = 10.0
+    version: str | None = None
 
 
 class ProviderError(RuntimeError):
@@ -20,17 +21,17 @@ class ProviderError(RuntimeError):
 
 
 class HTTPDataProvider:
-    """Transport-neutral HTTP provider.
-
-    The actual HTTP implementation is injected so the data layer remains easy
-    to test and can later use the project's preferred HTTP client.
-    """
+    """Transport-neutral HTTP provider with explicit provenance metadata."""
 
     name = "http"
 
     def __init__(self, fetcher: Fetcher, config: ProviderConfig | None = None) -> None:
         self._fetcher = fetcher
         self._config = config or ProviderConfig()
+
+    @property
+    def version(self) -> str | None:
+        return self._config.version
 
     def fetch(self, dataset: str) -> Any:
         try:
