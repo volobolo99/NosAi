@@ -64,3 +64,6 @@ jobs:
 
       - name: Run regression suite
         run: python -m pytest -q
+
+      - name: Run AI evaluation gate
+        run: python -m pytest -q tests/unit/test_ai_evaluation.py
