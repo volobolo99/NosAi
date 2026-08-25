@@ -3,7 +3,6 @@ from pathlib import Path
 from app.self_repair import ErrorEvent, RepairCandidate, RepairEngine, RepairPolicy
 from app.self_repair.journal import RepairJournal
 from app.self_repair.models import FileOperation
-from app.self_repair.workspace import WorkspacePolicyError
 
 
 def candidate(event_id: str, operation: FileOperation, *, confidence: float = 0.95, risk: float = 0.05) -> RepairCandidate:
