@@ -7,6 +7,7 @@ from app.static_data.providers import ProviderError
 
 class Provider:
     name = "test"
+    version = "2026.08"
 
     def __init__(self, value=None, error=None):
         self.value = value
@@ -41,6 +42,18 @@ def test_gateway_does_not_hide_provider_failure_when_stale_fallback_disabled():
     provider.error = ProviderError("offline")
     with pytest.raises(ProviderError):
         gateway.get("items")
+
+
+def test_gateway_persists_cache_and_provenance(tmp_path):
+    cache_path = tmp_path / "cache.bin"
+    provider = Provider(value={"id": 7})
+    first = DataGateway(provider, {"items": CachePolicy(60)}, cache_path)
+    assert first.get("items") == {"id": 7}
+    assert first._cache["items"].version == "2026.08"
+
+    provider.error = ProviderError("offline")
+    second = DataGateway(provider, {"items": CachePolicy(60, True)}, cache_path)
+    assert second.get("items") == {"id": 7}
 
 
 def test_manifest_rejects_malformed_dataset_entry():
