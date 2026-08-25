@@ -16,6 +16,7 @@ SCENARIOS = ("combat_basic", "missing_target", "stale_state")
 
 
 def _single_run(args: argparse.Namespace) -> dict:
+    """Run one deterministic scenario and return its diagnostic summary."""
     result = TestPilot(
         SimulatedClientAdapter(scenario=args.scenario),
         PilotSessionConfig(
@@ -43,6 +44,7 @@ def _single_run(args: argparse.Namespace) -> dict:
 
 
 def main() -> int:
+    """Parse CLI options, run the requested safe diagnostic mode, and print JSON."""
     parser = argparse.ArgumentParser(description="Run NosAi Test Pilot in safe non-live modes")
     parser.add_argument("--scenario", default="combat_basic", choices=SCENARIOS)
     parser.add_argument("--all-scenarios", action="store_true", help="Run the complete safe diagnostic suite")
