@@ -1,0 +1,35 @@
+name: Hardware Benchmark
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'app/**'
+      - 'tools/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - '.github/workflows/hardware-benchmark.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+      - run: python -m pip install -e '.[test]'
+      - run: python tools/hardware_benchmark.py --output artifacts/hardware_benchmark.json
+      - run: python -m pytest -q tests/test_hardware_benchmark.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nosai-hardware-benchmark
+          path: artifacts/hardware_benchmark.json
+          if-no-files-found: error

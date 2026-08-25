@@ -10,9 +10,14 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 m1-learning = ["torch>=2.0"]
+test = [
+  "pytest>=8,<9",
+  "numpy>=1.26,<3",
+]
 dev = [
   "pytest>=8,<9",
   "ruff>=0.6,<1",
+  "numpy>=1.26,<3",
 ]
 
 [tool.setuptools.packages.find]
