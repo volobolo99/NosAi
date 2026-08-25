@@ -16,14 +16,6 @@ class PilotMode(str, Enum):
     DRY_RUN = "dry_run"
 
 
-class StateQuality(str, Enum):
-    """Quality gate for the state presented to the decision engine."""
-
-    VALID = "valid"
-    DEGRADED = "degraded"
-    UNUSABLE = "unusable"
-
-
 @dataclass(frozen=True)
 class PilotSessionConfig:
     mode: PilotMode = PilotMode.SIMULATION
@@ -65,8 +57,6 @@ class PilotResult:
     ticks: int
     decisions: int
     valid_decisions: int
-    blocked_decisions: int
-    state_quality_counts: dict[str, int]
     errors: tuple[PilotError, ...]
     missing_capabilities: tuple[str, ...]
     avg_decision_latency_ms: float | None
