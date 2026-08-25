@@ -24,12 +24,13 @@ dev = [
 
 [project.scripts]
 nosai-preflight = "app.preflight:main"
+nosai-pilot = "app.pilot.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
 
 [tool.pytest.ini_options]
-pythonpath = ["."]  
+pythonpath = ["."]
 testpaths = ["tests"]
 addopts = "-q"
 
