@@ -53,8 +53,8 @@ jobs:
           test -f app/m1/world_model/latent.py
           test -f tests/conftest.py
           test -f setup.py
-          if find . -type d -name '__pycache__' -not -path './.git/*' | grep -q .; then exit 1; fi
-          if find . -type f -name '*.pyc' -not -path './.git/*' | grep -q .; then exit 1; fi
+          test -z "$(find . -type d -name '__pycache__' -not -path './.git/*' -print -quit)"
+          test -z "$(find . -type f -name '*.pyc' -not -path './.git/*' -print -quit)"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A
