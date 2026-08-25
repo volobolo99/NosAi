@@ -38,7 +38,7 @@ def profile_benchmark(
     top_functions: int = 12,
 ) -> tuple[RuntimeProfile, BenchmarkReport]:
     """Profile the deterministic benchmark and return both profile and benchmark report."""
-    config = config or BenchmarkConfig(episodes=25, max_steps=10, simulations=32, horizon=3)
+    config = config or BenchmarkConfig(name="runtime-profile", episodes=25, max_steps=10, simulations=32, horizon=3)
     selected_levels = tuple(levels)
     runner = BenchmarkRunner(config)
     profiler = cProfile.Profile()
