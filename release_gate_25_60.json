@@ -1,0 +1,27 @@
+{
+  "version": "4.19.0",
+  "points": {
+    "start": 25,
+    "end": 60,
+    "count": 36
+  },
+  "checks": {
+    "tests": true,
+    "compileall": true,
+    "wheel": true,
+    "wheel_integrity": true,
+    "long_run_10000": true,
+    "fault_injection": true,
+    "recovery": true,
+    "reproducibility": true
+  },
+  "pytest_tail": "........................................................................ [ 46%]\n........................................................................ [ 93%]\n..........                                                               [100%]\n154 passed in 13.28s\n",
+  "decision": {
+    "action": "a",
+    "score": 1.640375,
+    "confidence": 0.81
+  },
+  "wheel": "nos_ai_project-4.19.0-py3-none-any.whl",
+  "wheel_sha256": "941800076e6deac310874383c6558030c3161f2869d914884141c6a1a7fa4517",
+  "release_pass": true
+}
