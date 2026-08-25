@@ -51,7 +51,7 @@ def update_learning_ledger(errors: list[dict[str, Any]], scenario: str, path: st
             existing[error_id] = asdict(
                 LearningRecord(
                     error_id=error_id,
-                    category=str(error.get("category", "unknown")),
+                    category=str(error.get("category", error.get("component", "unknown"))),
                     message=str(error.get("message", "")),
                     scenario=scenario,
                     observed_count=1,
