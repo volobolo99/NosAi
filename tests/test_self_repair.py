@@ -33,7 +33,7 @@ def test_rejected_candidate_is_rolled_back(tmp_path: Path) -> None:
     file_path = target / "state.txt"
     file_path.write_text("original", encoding="utf-8")
     journal = RepairJournal(tmp_path / "events.jsonl")
-    policy = RepairPolicy(test_command=("python", "-c", "raise SystemExit(1)"))
+    policy = RepairPolicy(test_commands=(("python", "-c", "raise SystemExit(1)"),))
     engine = RepairEngine(tmp_path, journal, policy)
     event = ErrorEvent("ERR-2", "TEST", "x", "failure")
     operation = FileOperation("modify", "app/state.txt", "broken")
