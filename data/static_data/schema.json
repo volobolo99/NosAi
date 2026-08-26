@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "NosAi Static Data",
+  "type": "object",
+  "required": ["schema_version", "source", "records"],
+  "properties": {
+    "schema_version": {"type": "integer", "minimum": 1},
+    "source": {"type": "string", "minLength": 1},
+    "source_version": {"type": ["string", "null"]},
+    "retrieved_at": {"type": ["string", "null"]},
+    "records": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "fields"],
+        "properties": {
+          "id": {"type": "string"},
+          "kind": {"type": "string"},
+          "fields": {"type": "object"},
+          "provenance": {"type": "object"}
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}
