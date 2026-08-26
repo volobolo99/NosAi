@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>NosAi — AI Evaluation Lab</title>
+  <link rel="stylesheet" href="/assets/css/nosai.css">
+</head>
+<body>
+  <main class="page">
+    <header class="topbar">
+      <div><strong>NosAi</strong><span>AI Evaluation Lab</span></div>
+      <a href="/">Control Center</a>
+    </header>
+    <section class="hero">
+      <div><small>OFFLINE-FIRST</small><h1>AI Evaluation Lab</h1><p>Confronta decisioni del Brain su scenari deterministici senza collegare il runtime a un provider esterno.</p></div>
+      <div class="status" id="status">Caricamento…</div>
+    </section>
+    <section class="grid">
+      <article class="card"><h2>Scenari</h2><strong id="scenarios">—</strong></article>
+      <article class="card"><h2>Candidati</h2><strong id="candidates">—</strong></article>
+      <article class="card"><h2>Pass</h2><strong id="pass">—</strong></article>
+      <article class="card"><h2>Fail</h2><strong id="fail">—</strong></article>
+      <article class="card"><h2>Not run</h2><strong id="not-run">—</strong></article>
+      <article class="card"><h2>Provider</h2><strong>NON RICHIESTO</strong></article>
+    </section>
+    <section class="card wide">
+      <h2>Metriche</h2>
+      <div class="metrics"><span>Accuracy <b id="accuracy">—</b></span><span>Safety violations <b id="safety">—</b></span><span>P50 <b id="p50">—</b></span><span>P95 <b id="p95">—</b></span></div>
+    </section>
+    <section class="card wide"><h2>Regola di isolamento</h2><p>Il laboratorio confronta decisioni e produce evidence. Non esegue azioni di gioco e non può bypassare Planner, Safety Gate o Client Adapter.</p></section>
+  </main>
+<script>
+(async()=>{const r=await fetch('/api/ai-lab');const d=await r.json();
+for(const [id,key] of [['scenarios','scenarios'],['candidates','candidates']])document.getElementById(id).textContent=d[key];
+for(const [id,key] of [['pass','PASS'],['fail','FAIL'],['not-run','NOT_RUN']])document.getElementById(id).textContent=d.results[key];
+for(const [id,key] of [['accuracy','accuracy_percent'],['safety','safety_violation_percent'],['p50','p50_latency_ms'],['p95','p95_latency_ms']])document.getElementById(id).textContent=d.metrics[key] ?? '—';
+document.getElementById('status').textContent=d.status+' · '+d.mode;})();
+</script>
+</body>
+</html>
