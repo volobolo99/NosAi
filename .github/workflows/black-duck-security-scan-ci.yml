@@ -1,5 +1,5 @@
-# This workflow uses actions that are not certified by GitHub.
-# They are provided by a third-party and are governed by separate terms.
+# Optional Black Duck security scanning.
+# When vendor credentials are not configured, the workflow succeeds with an explicit no-op.
 
 name: CI Black Duck security scan
 
@@ -10,23 +10,31 @@ on:
     branches: [ "main" ]
   schedule:
     - cron: '36 19 * * 3'
+  workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
-  build:
-    # Enable by setting repository variable BLACKDUCK_ENABLED=true.
-    # Without configured vendor credentials, the security scan must not fail CI.
-    if: ${{ vars.BLACKDUCK_ENABLED == 'true' }}
+  security-scan:
+    name: Black Duck security scan
     runs-on: ubuntu-latest
     permissions:
       contents: read
       pull-requests: write
       security-events: write
       actions: read
-
     steps:
+      - name: Report disabled configuration
+        if: ${{ vars.BLACKDUCK_ENABLED != 'true' }}
+        run: echo "Black Duck is not configured; security scan intentionally disabled. Workflow health: OK."
+
       - name: Checkout source
+        if: ${{ vars.BLACKDUCK_ENABLED == 'true' }}
         uses: actions/checkout@v4
+
       - name: Black Duck security scan
+        if: ${{ vars.BLACKDUCK_ENABLED == 'true' }}
         uses: blackduck-inc/black-duck-security-scan@805cbd09e806b01907bbea0f990723c2bb85abe9
         with:
           blackducksca_url: ${{ vars.BLACKDUCKSCA_URL }}
