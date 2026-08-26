@@ -14,14 +14,18 @@ from .sources import all_sources, image_reference
 try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
     from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
+    from fastapi.staticfiles import StaticFiles
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.5")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.6")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
+ASSET_ROOT = WEB_ROOT / "assets"
 _runtime_adapter: Any | None = None
 _TEST_NAV = '<a href="/test-center" style="display:block;color:#8fe3ff;text-decoration:none;padding:11px 12px;border-radius:10px">🧪 Test & verifica</a>'
+
+app.mount("/assets", StaticFiles(directory=ASSET_ROOT), name="dashboard-assets")
 
 
 def set_runtime_adapter(adapter: Any | None) -> None:
@@ -50,16 +54,43 @@ def configure_nostale_observation() -> str:
 configure_nostale_observation()
 
 
+def _page(name: str) -> FileResponse:
+    return FileResponse(WEB_ROOT / name)
+
+
 @app.get("/")
-def home() -> HTMLResponse:
-    html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
-    html = html.replace("</nav>", f"{_TEST_NAV}</nav>", 1)
-    return HTMLResponse(html)
+def home() -> FileResponse:
+    return _page("control_center.html")
+
+
+@app.get("/control-center")
+def control_center() -> FileResponse:
+    return _page("control_center.html")
+
+
+@app.get("/runtime")
+def runtime_page() -> FileResponse:
+    return _page("control_center.html")
+
+
+@app.get("/game-view")
+def game_view() -> FileResponse:
+    return _page("game_view.html")
+
+
+@app.get("/diagnostics")
+def diagnostics_page() -> FileResponse:
+    return _page("diagnostics.html")
+
+
+@app.get("/sources")
+def sources_page() -> FileResponse:
+    return _page("sources.html")
 
 
 @app.get("/test-center")
 def test_center() -> FileResponse:
-    return FileResponse(WEB_ROOT / "test_center.html")
+    return _page("test_center.html")
 
 
 @app.get("/api/test-center")
@@ -69,14 +100,22 @@ def test_center_data() -> dict[str, Any]:
     data["ci"] = ci
     junit = ci.get("junit", {}) if isinstance(ci, dict) else {}
     coverage = ci.get("coverage", {}) if isinstance(ci, dict) else {}
+    security = ci.get("security", {}) if isinstance(ci, dict) else {}
+    sbom = ci.get("sbom", {}) if isinstance(ci, dict) else {}
     if junit.get("status") == "FAIL":
         data["gates"]["G3"] = "FAIL"
     elif junit.get("status") == "PASS":
         data["gates"]["G3"] = "PASS"
+    elif junit.get("status") == "NOT_RUN":
+        data["gates"]["G3"] = "NOT_RUN"
     if coverage.get("status") == "PASS":
         data["gates"]["G6"] = "PASS"
     elif coverage.get("status") == "FAIL":
         data["gates"]["G6"] = "FAIL"
+    elif coverage.get("status") == "NOT_RUN":
+        data["gates"]["G6"] = "NOT_RUN"
+    data["security"] = security
+    data["sbom"] = sbom
     return data
 
 
