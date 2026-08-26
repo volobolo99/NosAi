@@ -10,7 +10,6 @@ import zipfile
 from io import BytesIO
 from pathlib import Path
 from typing import Any
-from xml.etree import ElementTree
 
 ROOT = Path(__file__).resolve().parents[2]
 EXCLUDED = {".git", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache"}
@@ -80,34 +79,111 @@ def ci_evidence() -> dict[str, Any]:
 
 
 def scan_repository() -> dict[str, Any]:
-    files = _files(); records: list[dict[str, Any]] = []; edges: list[dict[str, str]] = []; errors: list[dict[str, str]] = []
+    files = _files()
+    records: list[dict[str, Any]] = []
+    edges: list[dict[str, str]] = []
+    errors: list[dict[str, str]] = []
     test_files = {p for p in files if "tests" in p.parts}
     for path in files:
-        text = path.read_text(encoding="utf-8", errors="replace"); tree, error = _parse(path); rel = path.relative_to(ROOT).as_posix(); lines = text.splitlines()
-        record = {"path": rel, "module": _module_name(path), "bytes": path.stat().st_size, "lines": len(lines), "nonblank_lines": sum(bool(x.strip()) for x in lines), "comment_lines": sum(x.lstrip().startswith("#") for x in lines), "sha256_16": hashlib.sha256(text.encode("utf-8")).hexdigest()[:16], "parse": "PASS" if tree is not None else "FAIL", "symbols": [], "imports": [], "calls": [], "tests": [], "assertions": 0, "weight_flags": []}
+        text = path.read_text(encoding="utf-8", errors="replace")
+        tree, error = _parse(path)
+        rel = path.relative_to(ROOT).as_posix()
+        lines = text.splitlines()
+        record: dict[str, Any] = {
+            "path": rel,
+            "module": _module_name(path),
+            "bytes": path.stat().st_size,
+            "lines": len(lines),
+            "nonblank_lines": sum(bool(x.strip()) for x in lines),
+            "comment_lines": sum(x.lstrip().startswith("#") for x in lines),
+            "sha256_16": hashlib.sha256(text.encode("utf-8")).hexdigest()[:16],
+            "parse": "PASS" if tree is not None else "FAIL",
+            "symbols": [],
+            "imports": [],
+            "calls": [],
+            "tests": [],
+            "assertions": 0,
+            "weight_flags": [],
+        }
         if error:
-            record["error"] = error; errors.append({"path": rel, "error": error}); records.append(record); continue
+            record["error"] = error
+            errors.append({"path": rel, "error": error})
+            records.append(record)
+            continue
         assert tree is not None
         for node in ast.walk(tree):
-            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)): record["symbols"].append({"name": node.name, "kind": type(node).__name__, "line": node.lineno})
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                record["symbols"].append({"name": node.name, "kind": type(node).__name__, "line": node.lineno})
             elif isinstance(node, (ast.Import, ast.ImportFrom)):
-                names = [a.name for a in node.names]; record["imports"].extend(names); edges.extend({"from": record["module"], "to": name, "kind": "import"} for name in names)
+                names = [a.name for a in node.names]
+                record["imports"].extend(names)
+                edges.extend({"from": record["module"], "to": name, "kind": "import"} for name in names)
             elif isinstance(node, ast.Call):
-                func = node.func; name = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else None
-                if name: record["calls"].append(name)
-            elif isinstance(node, ast.Assert): record["assertions"] += 1
-        if record["bytes"] > 50000: record["weight_flags"].append("OVERSIZED")
-        elif record["bytes"] > 20000: record["weight_flags"].append("LARGE")
-        if record["lines"] and record["comment_lines"] / record["lines"] > 0.35: record["weight_flags"].append("COMMENT_HEAVY")
+                func = node.func
+                name = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else None
+                if name:
+                    record["calls"].append(name)
+            elif isinstance(node, ast.Assert):
+                record["assertions"] += 1
+        if record["bytes"] > 50000:
+            record["weight_flags"].append("OVERSIZED")
+        elif record["bytes"] > 20000:
+            record["weight_flags"].append("LARGE")
+        if record["lines"] and record["comment_lines"] / record["lines"] > 0.35:
+            record["weight_flags"].append("COMMENT_HEAVY")
         if "tests" in path.parts:
             record["test_count"] = sum(1 for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith("test_"))
-            if record["test_count"] and record["assertions"] == 0: record["weight_flags"].append("NO_ASSERT")
+            if record["test_count"] and record["assertions"] == 0:
+                record["weight_flags"].append("NO_ASSERT")
         records.append(record)
+
     source_files = [r for r in records if r["path"].startswith("app/")]
     for record in source_files:
-        stem = Path(record["path"]).stem; parent = Path(record["path"]).parent.name
+        stem = Path(record["path"]).stem
+        parent = Path(record["path"]).parent.name
         record["tests"] = sorted({p.relative_to(ROOT).as_posix() for p in test_files if stem in p.stem or parent in p.parts})
-    parsed = sum(r["parse"] == "PASS" for r in records); unsafe = [r["path"] for r in records if r["path"].startswith("app/ai/") and FORBIDDEN_AI_CALLS.intersection(r["calls"])]
-    evidence = ci_evidence(); junit = evidence.get("junit", {}); coverage = evidence.get("coverage", {}); ci = evidence.get("ci", {})
-    gates = {"G0": "PASS" if records else "FAIL", "G1": "PASS" if records and parsed == len(records) else "FAIL", "G2": ci.get("static", "NOT_RUN"), "G3": junit.get("status", "NOT_RUN"), "G4": ci.get("e2e", "NOT_RUN"), "G5": "FAIL" if unsafe else "PASS", "G6": "PASS" if coverage.get("status") == "PASS" else "WARN"}
-    return {"root": str(ROOT), "files": records, "communications": edges, "errors": errors, "safety_violations": unsafe, "gates": gates, "ci": ci, "junit": junit, "coverage": coverage, "evidence": {k: evidence.get(k) for k in ("source", "artifact", "commit", "run_id", "workflow", "ref", "repository") if k in evidence}, "summary": {"files": len(records), "source_files": len(source_files), "test_files": len(test_files), "parse_failures": len(errors), "communication_edges": len(edges), "bytes": sum(r["bytes"] for r in records), "lines": sum(r["lines"] for r in records), "weight_flags": sum(bool(r["weight_flags"]) for r in records)}}
+
+    parsed = sum(r["parse"] == "PASS" for r in records)
+    unsafe = [r["path"] for r in records if r["path"].startswith("app/ai/") and FORBIDDEN_AI_CALLS.intersection(r["calls"])]
+    evidence = ci_evidence()
+    junit = evidence.get("junit", {})
+    coverage = evidence.get("coverage", {})
+    ci = evidence.get("ci", {})
+    security = evidence.get("security", {})
+    sbom = evidence.get("sbom", {})
+    static_ok = ci.get("static") == "success"
+    security_ok = security.get("status") == "PASS"
+    sbom_ok = sbom.get("status") == "PASS"
+    gates = {
+        "G0": "PASS" if records else "FAIL",
+        "G1": "PASS" if records and parsed == len(records) else "FAIL",
+        "G2": "PASS" if static_ok and security_ok and sbom_ok else ("WARN" if not security else "FAIL"),
+        "G3": junit.get("status", "NOT_RUN"),
+        "G4": ci.get("e2e", "NOT_RUN"),
+        "G5": "FAIL" if unsafe else "PASS",
+        "G6": "PASS" if coverage.get("status") == "PASS" else "WARN",
+    }
+    return {
+        "root": str(ROOT),
+        "files": records,
+        "communications": edges,
+        "errors": errors,
+        "safety_violations": unsafe,
+        "gates": gates,
+        "ci": ci,
+        "junit": junit,
+        "coverage": coverage,
+        "security": security,
+        "sbom": sbom,
+        "evidence": {k: evidence.get(k) for k in ("source", "artifact", "commit", "run_id", "workflow", "ref", "repository") if k in evidence},
+        "summary": {
+            "files": len(records),
+            "source_files": len(source_files),
+            "test_files": len(test_files),
+            "parse_failures": len(errors),
+            "communication_edges": len(edges),
+            "bytes": sum(r["bytes"] for r in records),
+            "lines": sum(r["lines"] for r in records),
+            "weight_flags": sum(bool(r["weight_flags"]) for r in records),
+        },
+    }
