@@ -21,8 +21,8 @@ class PacketDefinition:
     notes: str = ""
 
     def __post_init__(self) -> None:
-        if self.direction not in {"send", "recv"}:
-            raise ValueError("direction must be send or recv")
+        if self.direction not in {"send", "recv", "unknown"}:
+            raise ValueError("direction must be send, recv, or unknown")
         if not 0.0 <= self.confidence <= 1.0:
             raise ValueError("confidence must be between 0 and 1")
 
@@ -39,10 +39,10 @@ class PacketCatalog:
         self._entries[key] = definition
 
     def get(self, direction: str, header: str) -> PacketDefinition | None:
-        return self._entries.get((direction, header))
+        return self._entries.get((direction, header)) or self._entries.get(("unknown", header))
 
     def entries(self) -> tuple[PacketDefinition, ...]:
-        return tuple(sorted(self._entries.values(), key=lambda x: (x.direction, x.header)))
+        return tuple(sorted(self._entries.values(), key=lambda x: (x.header, x.direction)))
 
     def to_json(self, path: str | Path) -> None:
         payload = {"version": self.version, "packets": [asdict(e) for e in self.entries()]}
