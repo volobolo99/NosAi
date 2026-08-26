@@ -5,13 +5,16 @@ from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Mapping, Optional, Tuple
 
-CONTRACT_VERSION = "1.0"
+CONTRACT_VERSION = "1.1"
 
 
 class ActionKind(str, Enum):
     NOOP = "noop"
     MOVE = "move"
     ATTACK = "attack"
+    HEAL = "heal"
+    RETREAT = "retreat"
+    WAIT = "wait"
     USE_SKILL = "use_skill"
     USE_ITEM = "use_item"
     INTERACT = "interact"
