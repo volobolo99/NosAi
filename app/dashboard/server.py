@@ -43,7 +43,18 @@ def test_center() -> FileResponse:
 @app.get("/api/test-center")
 def test_center_data() -> dict[str, Any]:
     data = scan_repository()
-    data["ci"] = load_ci_evidence()
+    ci = load_ci_evidence()
+    data["ci"] = ci
+    junit = ci.get("junit", {}) if isinstance(ci, dict) else {}
+    coverage = ci.get("coverage", {}) if isinstance(ci, dict) else {}
+    if junit.get("status") == "FAIL":
+        data["gates"]["G3"] = "FAIL"
+    elif junit.get("status") == "PASS":
+        data["gates"]["G3"] = "PASS"
+    if coverage.get("status") == "PASS":
+        data["gates"]["G6"] = "PASS"
+    elif coverage.get("status") == "FAIL":
+        data["gates"]["G6"] = "FAIL"
     return data
 
 
