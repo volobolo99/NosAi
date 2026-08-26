@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "purpose": "Public reference screenshots for NosAi vision calibration; not ground-truth training data.",
+  "observation_only": true,
+  "acceptance": {
+    "min_entity_confidence": 0.78,
+    "same_resolution_required_for_target_profile": true,
+    "action_execution_enabled": false
+  },
+  "references": [
+    {
+      "id": "combat_dungeon_01",
+      "source_url": "https://www.zonammorpg.com/wp-content/uploads/2009/07/mmorpg-fantasy-nostale-screenshot2.jpg",
+      "source_page": "https://www.zonammorpg.com/juegos/nostale/",
+      "classes": ["mob", "combat", "hud", "minimap"],
+      "use": "reference for combat composition, visible mobs, damage numbers, HUD/minimap layout",
+      "ground_truth": false
+    },
+    {
+      "id": "npc_nosville_01",
+      "source_url": "https://1.bp.blogspot.com/-wKnAT6r824c/T1zQdl-667I/AAAAAAAAAI0/v58z8lw6_rI/s1600/20120311-10-PorqueSi.jpg",
+      "source_page": "https://nostaleguia10.blogspot.com/2012/03/npc-mas-reconocidos-en-el-juego-guia-4.html",
+      "classes": ["player", "npc", "minimap", "hud"],
+      "use": "reference for NPC/player spatial separation and minimap/HUD layout",
+      "ground_truth": false
+    },
+    {
+      "id": "world_mob_01",
+      "source_url": "https://jolstatic.fr/www/captures/689/2/8512.jpg",
+      "source_page": "https://www.jeuxonline.info/image/8512",
+      "classes": ["player", "mob", "world", "minimap", "hud"],
+      "use": "reference for open-world player and creature detection",
+      "ground_truth": false
+    },
+    {
+      "id": "combat_mob_01",
+      "source_url": "https://bananatic-15199.kxcdn.com/it/photos/bananapedia/3e0d0264d284d583f31ea4b6f2474fb6.jpg",
+      "source_page": "https://www.bananatic.com/it/giochi/nostale-200/come-fare-soldi-su-nostale-15436",
+      "classes": ["player", "mob", "combat", "minimap", "hud"],
+      "use": "reference for close-range combat and multiple mob instances",
+      "ground_truth": false
+    }
+  ],
+  "official_ui_reference": "https://gameguide.nostale.it/main/game_interface",
+  "official_control_reference": "https://gameguide.nostale.it/tutorial/index"
+}
