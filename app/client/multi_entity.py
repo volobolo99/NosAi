@@ -106,7 +106,9 @@ class MultiEntityRecognizer:
         return _crop(image, roi)
 
     @staticmethod
-    def _dedupe(detections: list[Detection], iou_threshold: float = 0.50) -> tuple[Detection, ...]:
+    def _dedupe(
+        detections: list[Detection], iou_threshold: float = 0.50
+    ) -> tuple[Detection, ...]:
         def iou(a: Detection, b: Detection) -> float:
             ax2, ay2 = a.x + a.width, a.y + a.height
             bx2, by2 = b.x + b.width, b.y + b.height
@@ -121,9 +123,12 @@ class MultiEntityRecognizer:
 
         result: list[Detection] = []
         for item in sorted(detections, key=lambda d: d.confidence, reverse=True):
-            if any(item.kind == old.kind and iou(item, old) >= iou_threshold for old in result):
-                continue
-            result.append(item)
+            duplicate = any(
+                item.kind == old.kind and iou(item, old) >= iou_threshold
+                for old in result
+            )
+            if not duplicate:
+                result.append(item)
         return tuple(result)
 
     def _detect_roi(self, image, roi: Roi) -> tuple[Detection, ...]:
@@ -148,9 +153,9 @@ class MultiEntityRecognizer:
     def recognize(self, image) -> MultiEntityObservation:
         world = self._detect_roi(image, self.world_roi) if self.world_roi else ()
         grouped = {"player": [], "npc": [], "mob": []}
-        for d in world:
-            if d.kind in grouped:
-                grouped[d.kind].append(d)
+        for detection in world:
+            if detection.kind in grouped:
+                grouped[detection.kind].append(detection)
         for key in grouped:
             grouped[key] = list(self._dedupe(grouped[key]))
 
@@ -158,9 +163,6 @@ class MultiEntityRecognizer:
         if self.minimap_roi is not None:
             mini = self._detect_roi(image, self.minimap_roi)
             _, mx, my = self._inside(image, self.minimap_roi)
-            _, mw, mh = image.shape[0], image.shape[1], image.shape[0]
-            # Confidence represents the strongest verified marker; empty minimaps
-            # remain valid observations with confidence 0 rather than false positives.
             confidence = max((d.confidence for d in mini), default=0.0)
             minimap = MinimapObservation(
                 mx,
