@@ -12,7 +12,7 @@ from app.benchmark.runner import BenchmarkConfig
 def main() -> int:
     parser = argparse.ArgumentParser(description="Profile the deterministic NosAi benchmark")
     parser.add_argument("--output", type=Path, default=Path("runtime_profile.json"))
-    parser.add_argument("--episodes", type=int, default=25)
+    parser.add_argument("--episodes", type=int, default=20)
     parser.add_argument("--max-steps", type=int, default=10)
     parser.add_argument("--simulations", type=int, default=32)
     parser.add_argument("--horizon", type=int, default=3)
