@@ -1,29 +1,29 @@
-"""FastAPI/WebSocket gateway for the NosAi observability dashboard.
-
-Install the optional dashboard extra before running this module:
-    pip install -e '.[dashboard]'
-    uvicorn app.dashboard.server:app --reload
-"""
-
+"""FastAPI/WebSocket gateway for the NosAi observability dashboard."""
 from __future__ import annotations
 
-import asyncio
 from pathlib import Path
 from typing import Any
 
 from .events import DashboardEvent, DashboardEventBus
 from .sources import all_sources, image_reference
+from .state import DashboardState
 
 try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
     from fastapi.responses import FileResponse
-except ImportError as exc:  # pragma: no cover - exercised only without optional deps
+except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-
-app = FastAPI(title="NosAi — Centro di controllo", version="1.0")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.1")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
+_runtime_adapter: Any | None = None
+
+
+def set_runtime_adapter(adapter: Any | None) -> None:
+    """Attach the observation-only runtime/client adapter."""
+    global _runtime_adapter
+    _runtime_adapter = adapter
 
 
 @app.get("/")
@@ -33,7 +33,10 @@ def home() -> FileResponse:
 
 @app.get("/api/stato")
 def stato() -> dict[str, Any]:
-    return {"stato": "pronto", "modalita": "sola osservazione", "connessione": "in attesa"}
+    if _runtime_adapter is None:
+        return {"stato": "pronto", "modalita": "sola osservazione", "connessione": "in attesa"}
+    from .state import snapshot_from_adapter
+    return snapshot_from_adapter(_runtime_adapter).to_dict()
 
 
 @app.get("/api/fonti")
@@ -43,7 +46,6 @@ def fonti() -> dict[str, str]:
 
 @app.get("/api/immagine-oggetto")
 def immagine_oggetto(image_url: str | None = None) -> dict[str, str | None]:
-    """Validate an image URL supplied by a data connector before exposing it."""
     return {"image_url": image_reference({"image_url": image_url})}
 
 
@@ -66,10 +68,3 @@ async def websocket(websocket: WebSocket) -> None:
         pass
     finally:
         bus.unsubscribe(queue)
-
-
-async def publish_heartbeat() -> None:
-    """Optional heartbeat task for a host runtime."""
-    while True:
-        bus.publish(DashboardEvent(tipo="heartbeat", dati={"stato": "attivo"}))
-        await asyncio.sleep(5)
