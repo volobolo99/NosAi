@@ -1,0 +1,13 @@
+{
+  "description": "Optional annotations for real NosTale screenshots. Coordinates are absolute pixels.",
+  "images": [
+    {
+      "file": "capture-01.png",
+      "entities": [
+        {"kind": "player", "x": 500, "y": 400, "width": 48, "height": 64},
+        {"kind": "npc", "x": 700, "y": 360, "width": 42, "height": 60},
+        {"kind": "mob", "x": 820, "y": 410, "width": 44, "height": 44}
+      ]
+    }
+  ]
+}
