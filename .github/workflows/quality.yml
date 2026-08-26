@@ -1,0 +1,100 @@
+name: NosAi Quality Gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nosai-quality-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: L0-L4 quality and regression gates
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Python
+        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install package and test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[test]'
+
+      - name: Dependency integrity
+        run: python -m pip check
+
+      - name: Static checks
+        run: python -m ruff check app tests
+
+      - name: Import/package smoke test
+        run: python -c "import app; print('app import OK')"
+
+      - name: Unit, contract and integration regression suite
+        run: python -m pytest -q --cov=app --cov-report=term-missing --cov-report=xml
+
+      - name: CLI smoke tests
+        run: |
+          nosai-preflight --help
+          nosai-client-probe --help
+          nosai-diagnostics --help
+          nosai-dashboard --help
+          nosai-knowledge-import --help
+
+      - name: Publish coverage artifact
+        if: always()
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874
+        with:
+          name: nosai-coverage-${{ github.sha }}
+          path: coverage.xml
+          if-no-files-found: ignore
+          retention-days: 14
+
+  safety:
+    name: Safety boundary gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Python
+        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: python -m pip install -e '.[test]'
+
+      - name: Observation-only safety tests
+        run: python -m pytest -q tests/test_ci_safety_contract.py tests/test_client_adapter.py tests/test_client_probe_runtime.py
+
+  benchmark-smoke:
+    name: Benchmark smoke gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: quality
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+
+      - name: Set up Python
+        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c
+        with:
+          python-version: '3.11'
+
+      - name: Install test dependencies
+        run: python -m pip install -e '.[test]'
+
+      - name: Benchmark smoke tests
+        run: python -m pytest -q tests/test_hardware_benchmark.py tests/benchmark
