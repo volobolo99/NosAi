@@ -56,6 +56,8 @@ def scan_repository() -> dict[str, Any]:
             "imports": [],
             "calls": [],
             "tests": [],
+            "assertions": 0,
+            "weight_flags": [],
         }
         if error:
             record["error"] = error
@@ -76,10 +78,20 @@ def scan_repository() -> dict[str, Any]:
                 name = func.id if isinstance(func, ast.Name) else func.attr if isinstance(func, ast.Attribute) else None
                 if name:
                     record["calls"].append(name)
+            elif isinstance(node, ast.Assert):
+                record["assertions"] += 1
+        if record["bytes"] > 50000:
+            record["weight_flags"].append("OVERSIZED")
+        elif record["bytes"] > 20000:
+            record["weight_flags"].append("LARGE")
+        if record["lines"] and record["comment_lines"] / record["lines"] > 0.35:
+            record["weight_flags"].append("COMMENT_HEAVY")
         if "tests" in path.parts:
             record["test_count"] = sum(
                 1 for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith("test_")
             )
+            if record["test_count"] and record["assertions"] == 0:
+                record["weight_flags"].append("NO_ASSERT")
         records.append(record)
 
     source_files = [r for r in records if r["path"].startswith("app/")]
@@ -124,5 +136,6 @@ def scan_repository() -> dict[str, Any]:
             "communication_edges": len(edges),
             "bytes": sum(r["bytes"] for r in records),
             "lines": sum(r["lines"] for r in records),
+            "weight_flags": sum(bool(r["weight_flags"]) for r in records),
         },
     }
