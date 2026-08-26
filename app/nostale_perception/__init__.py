@@ -8,6 +8,11 @@ from .evaluation import PerceptionEvaluation, evaluate
 from .gamestate import GameState, GameStateBuilder, PlayerState, WorldEntity
 from .ground_truth import FrameGroundTruth, load_ground_truth
 from .metrics import NumericMetric, classification_accuracy, numeric_metric
+from .network_decoder import DecodedObservation, DecoderRegistry
+from .network_replay import NetworkReplayRecorder, ReplayPacket
+from .network_coverage import DecoderCoverage, measure_coverage
+from .network_observation import NetworkObservation
+from .packet_catalog import PacketCatalog, PacketSpec
 from .perception import Frame, FrameSource, ObservationPipeline, PerceptionResult
 from .replay import ReplayFrame, ReplayFrameSource, write_jsonl
 from .ui_detector import BarObservation, PixelBarDetector
@@ -23,5 +28,7 @@ __all__ = [
     "WindowsWindowTarget", "Win32WindowCaptureBackend", "FrameGroundTruth", "load_ground_truth",
     "NumericMetric", "numeric_metric", "classification_accuracy", "DatasetManifest", "build_manifest",
     "sha256_file", "write_manifest", "PerceptionEvaluation", "evaluate", "append_capture",
-    "append_ground_truth", "capture_frames", "annotate_replay",
+    "append_ground_truth", "capture_frames", "annotate_replay", "NetworkObservation",
+    "PacketSpec", "PacketCatalog", "DecodedObservation", "DecoderRegistry", "ReplayPacket",
+    "NetworkReplayRecorder", "DecoderCoverage", "measure_coverage",
 ]
