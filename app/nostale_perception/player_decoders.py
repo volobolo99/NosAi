@@ -6,7 +6,7 @@ from .network_observation import NetworkObservation
 
 
 def _tokens(observation: NetworkObservation) -> list[str]:
-    return observation.payload.decode("utf-8", errors="replace").strip().split()
+    return observation.payload.strip().split()
 
 
 def decode_c_info(observation: NetworkObservation) -> DecodedObservation | None:
