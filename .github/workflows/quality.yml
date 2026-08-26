@@ -40,7 +40,16 @@ jobs:
         run: python -c "import app; print('app import OK')"
 
       - name: Unit, contract and integration regression suite
-        run: python -m pytest -q --cov=app --cov-report=term-missing --cov-report=xml
+        run: python -m pytest -q --maxfail=1 --junitxml=test-results.xml --cov=app --cov-report=term-missing --cov-report=xml
+
+      - name: Publish regression test results
+        if: always()
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874
+        with:
+          name: nosai-test-results-${{ github.sha }}
+          path: test-results.xml
+          if-no-files-found: ignore
+          retention-days: 14
 
       - name: CLI smoke tests
         run: |
