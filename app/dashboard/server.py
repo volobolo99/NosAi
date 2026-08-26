@@ -16,7 +16,7 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.3")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.4")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 _runtime_adapter: Any | None = None
@@ -25,7 +25,6 @@ _catalog = ItemCatalog()
 
 
 def set_runtime_adapter(adapter: Any | None) -> None:
-    """Attach the real, observation-only ClientAdapter."""
     global _runtime_adapter
     _runtime_adapter = adapter
 
@@ -69,6 +68,23 @@ def sonda_client() -> dict[str, Any]:
     from app.client.adapter_runtime import probe_client
     result = probe_client(_runtime_adapter)
     return {"connesso": result.connected, "stato_valido": result.state_valid, "azione_valida": result.action_valid, "dettaglio": result.detail}
+
+
+@app.get("/api/percezione")
+def percezione() -> dict[str, Any]:
+    """Capture one real frame and optionally enrich it with OpenAI vision."""
+    if _runtime_adapter is None:
+        return {"disponibile": False, "dettaglio": "nessun adapter collegato"}
+    capture = getattr(_runtime_adapter, "capture_screen", None)
+    if not callable(capture):
+        return {"disponibile": False, "dettaglio": "adapter senza cattura schermo"}
+    try:
+        frame = capture()
+        from app.client.vision_observation import analyze_frame
+        observation = analyze_frame(frame)
+        return {"disponibile": True, "larghezza": frame.width, "altezza": frame.height, "osservazione": observation.to_dict()}
+    except Exception as exc:  # safe boundary: perception cannot stop runtime
+        return {"disponibile": False, "dettaglio": str(exc)}
 
 
 @app.get("/api/fonti")
