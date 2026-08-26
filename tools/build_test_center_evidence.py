@@ -47,15 +47,21 @@ coverage = parse_coverage(Path("coverage.xml"))
 quality = os.environ.get("QUALITY_OUTCOME", "unknown")
 static = os.environ.get("STATIC_OUTCOME", "unknown")
 cli = os.environ.get("CLI_OUTCOME", "unknown")
+run_id = os.environ.get("GITHUB_RUN_ID")
+repository = os.environ.get("GITHUB_REPOSITORY")
 evidence = {
-    "schema": 1,
+    "schema": 2,
     "commit": os.environ.get("GITHUB_SHA"),
-    "run_id": os.environ.get("GITHUB_RUN_ID"),
+    "run_id": run_id,
     "workflow": os.environ.get("GITHUB_WORKFLOW"),
     "ref": os.environ.get("GITHUB_REF_NAME"),
-    "repository": os.environ.get("GITHUB_REPOSITORY"),
+    "repository": repository,
     "ci": {"status": "PASS" if quality == "success" and static == "success" and cli == "success" else "FAIL", "quality": quality, "static": static, "cli": cli},
     "junit": junit,
     "coverage": coverage,
+    "artifact": {
+        "name": f"nosai-test-center-{os.environ.get('GITHUB_SHA', 'unknown')}",
+        "url": f"https://github.com/{repository}/actions/runs/{run_id}" if repository and run_id else None,
+    },
 }
 out.write_text(json.dumps(evidence, indent=2, sort_keys=True), encoding="utf-8")
