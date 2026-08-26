@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from .contracts import Action, Decision, Observation
+from .contracts import Observation
 from .orchestrator import CycleResult, ZMSIAOrchestrator
 from .safety import SafetyPolicy
 from .validation import validate_action
@@ -16,11 +16,7 @@ class SafeCycleResult:
 
 
 class SafeZMSIAOrchestrator(ZMSIAOrchestrator):
-    """Orchestrator variant that validates and gates every proposed action.
-
-    This layer still does not execute actions. It only produces an explicit
-    authorization result for a future executor.
-    """
+    """Orchestrator variant that validates and gates every proposed action."""
 
     def __init__(self, decision_provider, safety_policy: SafetyPolicy) -> None:
         super().__init__(decision_provider)
@@ -32,7 +28,7 @@ class SafeZMSIAOrchestrator(ZMSIAOrchestrator):
         if not validation.valid:
             return SafeCycleResult(cycle=cycle, allowed=False, reason=validation.reason)
 
-        safety = self._safety_policy.evaluate(cycle.action)
+        safety = self._safety_policy.validate(cycle.action)
         return SafeCycleResult(
             cycle=cycle,
             allowed=safety.allowed,
