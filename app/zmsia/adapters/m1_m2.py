@@ -21,6 +21,7 @@ class M2PlannerLike(Protocol):
     """Minimum surface an existing M2 planner must expose to be adapted."""
 
     def plan(self, goal: Any, state: Any) -> Any:
+        """Return a planner-specific plan object for a goal and state."""
         ...
 
 
@@ -43,9 +44,12 @@ def m1_state_to_zmsia(state: M1State, *, observation_ids: tuple[str, ...] = ()) 
 
 def m1_action_to_zmsia(action: M1Action, *, decision_id: str = "") -> Action:
     """Convert an M1 action into an unchecked ZMSIA action intent."""
+    parameters = dict(action.parameters)
+    action_type = str(parameters.pop("action_type", action.id))
     return Action(
         action_id=str(action.id),
-        parameters=dict(action.parameters),
+        action_type=action_type,
+        parameters=parameters,
         decision_id=decision_id,
     )
 
@@ -85,6 +89,7 @@ def m2_plan_to_zmsia(plan: Any, *, goal_id: str) -> Plan:
 
 
 def _as_sequence(value: Any) -> Sequence[Any]:
+    """Normalize a scalar or iterable planner value into a tuple-like sequence."""
     if value is None:
         return ()
     if isinstance(value, (str, bytes)):
@@ -96,12 +101,14 @@ def _as_sequence(value: Any) -> Sequence[Any]:
 
 
 def _step_id(step: Any) -> str:
+    """Extract a stable step identifier without leaking the planner object."""
     if isinstance(step, Mapping):
         return str(step.get("id", step.get("action_id", step)))
     return str(getattr(step, "id", getattr(step, "action_id", step)))
 
 
 def _confidence_from_metadata(metadata: Mapping[str, Any]) -> float:
+    """Read and clamp an optional M1 confidence value."""
     value = metadata.get("confidence", 1.0)
     try:
         return max(0.0, min(1.0, float(value)))
