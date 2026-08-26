@@ -12,11 +12,13 @@ requires-python = ">=3.10"
 m1-learning = ["torch>=2.0"]
 test = [
   "pytest>=8,<9",
+  "pytest-cov>=5,<7",
   "torch>=2.0",
   "numpy>=1.26,<3",
 ]
 dev = [
   "pytest>=8,<9",
+  "pytest-cov>=5,<7",
   "ruff>=0.6,<1",
   "torch>=2.0",
   "numpy>=1.26,<3",
