@@ -6,7 +6,7 @@ agents, sandboxes, stores and telemetry systems must adapt to these contracts.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import datetime, timezone
 from enum import Enum
 from typing import Any, Mapping, Protocol, Sequence
@@ -24,6 +24,24 @@ class RunState(str, Enum):
     PROMOTABLE = "PROMOTABLE"
     REJECTED = "REJECTED"
     BLOCKED = "BLOCKED"
+
+
+_ALLOWED_TRANSITIONS: dict[RunState, frozenset[RunState]] = {
+    RunState.QUEUED: frozenset({RunState.CONTEXT_READY, RunState.BLOCKED}),
+    RunState.CONTEXT_READY: frozenset({RunState.PLANNED, RunState.BLOCKED}),
+    RunState.PLANNED: frozenset({RunState.EXECUTING, RunState.BLOCKED}),
+    RunState.EXECUTING: frozenset({RunState.TESTING, RunState.BLOCKED}),
+    RunState.TESTING: frozenset({RunState.VERIFYING, RunState.REJECTED, RunState.BLOCKED}),
+    RunState.VERIFYING: frozenset({RunState.EVALUATING, RunState.REJECTED, RunState.BLOCKED}),
+    RunState.EVALUATING: frozenset({RunState.PROMOTABLE, RunState.REJECTED, RunState.BLOCKED}),
+    RunState.PROMOTABLE: frozenset(),
+    RunState.REJECTED: frozenset(),
+    RunState.BLOCKED: frozenset(),
+}
+
+
+class InvalidRunTransition(ValueError):
+    """Raised when a run attempts to skip or reverse a lifecycle state."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -51,6 +69,18 @@ class RunRecord:
     lesson_id: str | None = None
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+def transition_run(run: RunRecord, target: RunState, *, reason: str | None = None) -> RunRecord:
+    """Advance a run through the explicit lifecycle without allowing bypasses."""
+    if target not in _ALLOWED_TRANSITIONS[run.state]:
+        raise InvalidRunTransition(f"cannot transition {run.state.value} -> {target.value}")
+    return replace(
+        run,
+        state=target,
+        failure_reason=reason if target in {RunState.REJECTED, RunState.BLOCKED} else run.failure_reason,
+        updated_at=datetime.now(timezone.utc),
+    )
 
 
 @dataclass(frozen=True, slots=True)
