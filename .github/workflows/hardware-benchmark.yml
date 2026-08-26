@@ -2,6 +2,14 @@ name: Hardware Benchmark
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'tools/**'
+      - 'tests/**'
+      - 'pyproject.toml'
+      - '.github/workflows/hardware-benchmark.yml'
   pull_request:
     paths:
       - 'app/**'
@@ -16,18 +24,24 @@ permissions:
 jobs:
   benchmark:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.11'
           cache: pip
-      - run: python -m pip install --upgrade pip
-      - run: python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
-      - run: python -m pip install -e '.[test]'
-      - run: python tools/hardware_benchmark.py --output artifacts/hardware_benchmark.json
-      - run: python -m pytest -q tests/test_hardware_benchmark.py
+      - name: Install build/test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install torch==2.8.0 --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e '.[test]'
+      - name: Compile sources
+        run: python -m compileall -q app tests tools
+      - name: Run hardware benchmark
+        run: python tools/hardware_benchmark.py --output artifacts/hardware_benchmark.json
+      - name: Validate benchmark artifact
+        run: python -m pytest -q tests/test_hardware_benchmark.py
       - uses: actions/upload-artifact@v4
         with:
           name: nosai-hardware-benchmark
