@@ -3,6 +3,8 @@ name: NosAi Quality Gates
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - '.nosai/test-center/latest.json'
   pull_request:
 
 permissions:
@@ -21,7 +23,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Set up Python
-        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.11'
           cache: pip
@@ -55,6 +57,11 @@ jobs:
           QUALITY_OUTCOME: ${{ steps.regression.outcome }}
           STATIC_OUTCOME: ${{ steps.static.outcome }}
           CLI_OUTCOME: ${{ steps.cli.outcome }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          GITHUB_WORKFLOW: ${{ github.workflow }}
+          GITHUB_REF_NAME: ${{ github.ref_name }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
         run: python tools/build_test_center_evidence.py
       - name: Publish Test Center evidence
         if: always()
@@ -76,6 +83,46 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  publish-test-center:
+    name: Persist Test Center evidence
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: quality
+    if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Download Test Center evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: nosai-test-center-${{ github.sha }}
+          path: .ci-test-center
+          if-no-artifact-found: warn
+      - name: Persist latest evidence snapshot
+        run: |
+          set -euo pipefail
+          if test -f .ci-test-center/test-center-evidence.json; then
+            mkdir -p .nosai/test-center
+            cp .ci-test-center/test-center-evidence.json .nosai/test-center/latest.json
+          else
+            echo 'No Test Center evidence artifact was produced; leaving previous snapshot unchanged.'
+          fi
+      - name: Commit evidence snapshot
+        if: hashFiles('.nosai/test-center/latest.json') != ''
+        run: |
+          set -euo pipefail
+          git config user.name 'NosAi CI'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add .nosai/test-center/latest.json
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m "ci(test-center): update latest verification evidence [skip ci]"
+          git push
+
   safety:
     name: Safety boundary gate
     runs-on: ubuntu-latest
@@ -85,7 +132,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Set up Python
-        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.11'
       - name: Install development test dependencies
@@ -102,7 +149,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Set up Python
-        uses: actions/setup-python@0a5c61591373683505ea898e09a3ea4f39ef2b9c
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.11'
       - name: Install development test dependencies
