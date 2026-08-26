@@ -1,11 +1,12 @@
 """Best-effort Windows hardware/runtime capability detection.
 
-The detector is deliberately dependency-light: it must run before optional AI
-packages are installed and must never make optional acceleration mandatory.
+The detector is deliberately dependency-light: it can run before optional AI
+packages are installed and never makes optional acceleration mandatory.
 """
 
 from __future__ import annotations
 
+import json
 import os
 import platform
 import shutil
@@ -54,20 +55,26 @@ def _powershell(command: str) -> str | None:
 def _gpu_info() -> tuple[str | None, str | None, int | None]:
     output = _powershell(
         "Get-CimInstance Win32_VideoController | "
-        "Select-Object -First 1 Name,AdapterCompatibility,AdapterRAM | "
+        "Select-Object Name,AdapterCompatibility,AdapterRAM | "
         "ConvertTo-Json -Compress"
     )
     if not output:
         return None, None, None
     try:
-        import json
-
         data = json.loads(output)
-        name = data.get("Name")
-        vendor = data.get("AdapterCompatibility")
-        ram = data.get("AdapterRAM")
-        return vendor, name, int(ram / (1024 * 1024)) if ram else None
-    except (ValueError, TypeError, ImportError):
+        if isinstance(data, dict):
+            data = [data]
+        if not data:
+            return None, None, None
+        # Prefer a controller with the largest reported VRAM.
+        item = max(data, key=lambda x: int(x.get("AdapterRAM") or 0))
+        ram = item.get("AdapterRAM")
+        return (
+            item.get("AdapterCompatibility"),
+            item.get("Name"),
+            int(ram / (1024 * 1024)) if ram else None,
+        )
+    except (ValueError, TypeError, KeyError):
         return None, None, None
 
 
@@ -86,7 +93,7 @@ def detect_hardware_profile() -> HardwareProfile:
     vendor, gpu_name, gpu_vram_mb = _gpu_info()
     ram_gb: float | None = None
     try:
-        import psutil  # optional
+        import psutil
 
         ram_gb = round(psutil.virtual_memory().total / (1024**3), 2)
     except (ImportError, AttributeError, OSError):
