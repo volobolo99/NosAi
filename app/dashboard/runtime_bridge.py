@@ -6,23 +6,17 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 from typing import Any
 
 from .catalog import ItemCatalog
 from .events import DashboardEvent, DashboardEventBus
 from .state import snapshot_from_adapter
 
-
-def publish_runtime_snapshot(adapter: Any, bus: DashboardEventBus, sessione: str = "runtime") -> DashboardEvent:
-    snapshot = snapshot_from_adapter(adapter).to_dict()
-    event = DashboardEvent(tipo="snapshot", sessione=sessione, dati=snapshot)
-    bus.publish(event)
-    return event
+LOGGER = logging.getLogger(__name__)
 
 
-def publish_runtime_trace(adapter: Any, bus: DashboardEventBus, sessione: str = "runtime") -> list[DashboardEvent]:
-    """Publish the real M1-M15 trace without inventing unavailable details."""
-    snapshot = snapshot_from_adapter(adapter).to_dict()
+def _publish_trace_snapshot(snapshot: dict[str, Any], bus: DashboardEventBus, sessione: str) -> list[DashboardEvent]:
     decision = snapshot.get("decision", {})
     supplied = decision.get("trace") or decision.get("decision_trace") or []
     has_trace = isinstance(supplied, list) and bool(supplied)
@@ -48,12 +42,24 @@ def publish_runtime_trace(adapter: Any, bus: DashboardEventBus, sessione: str = 
     return events
 
 
-class RuntimeDashboardStreamer:
-    """Continuously mirror a real ClientAdapter into the dashboard.
+def publish_runtime_snapshot(adapter: Any, bus: DashboardEventBus, sessione: str = "runtime") -> DashboardEvent:
+    snapshot = snapshot_from_adapter(adapter).to_dict()
+    event = DashboardEvent(tipo="snapshot", sessione=sessione, dati=snapshot)
+    bus.publish(event)
+    return event
 
-    The adapter remains the only source of client state. Every poll is
-    non-destructive. Inventory items are enriched through the catalog when
-    available, and the M1-M15 trace is emitted only when it changes.
+
+def publish_runtime_trace(adapter: Any, bus: DashboardEventBus, sessione: str = "runtime") -> list[DashboardEvent]:
+    """Publish the real M1-M15 trace from one normalized adapter read."""
+    snapshot = snapshot_from_adapter(adapter).to_dict()
+    return _publish_trace_snapshot(snapshot, bus, sessione)
+
+
+class RuntimeDashboardStreamer:
+    """Continuously mirror a real ClientAdapter into dashboard events.
+
+    All adapter reads remain observation-only. Blocking catalog/network work is
+    moved to worker threads so the asyncio event loop stays responsive.
     """
 
     def __init__(
@@ -73,6 +79,7 @@ class RuntimeDashboardStreamer:
         self.catalog = catalog
         self._task: asyncio.Task[None] | None = None
         self._last_trace_key: str | None = None
+        self._enrichment_cache: set[str] = set()
 
     @staticmethod
     def _trace_key(snapshot: dict[str, Any]) -> str:
@@ -80,31 +87,41 @@ class RuntimeDashboardStreamer:
         trace = decision.get("trace") or decision.get("decision_trace") or []
         return json.dumps(trace, ensure_ascii=False, sort_keys=True, default=str)
 
-    def _enrich_inventory(self, snapshot: dict[str, Any]) -> None:
+    async def _enrich_inventory(self, snapshot: dict[str, Any]) -> None:
         if self.catalog is None:
             return
+        jobs = []
         for item in snapshot.get("inventory", []):
-            if isinstance(item, dict):
-                try:
-                    self.catalog.enrich_observed(item)
-                except (OSError, ValueError, UnicodeError):
-                    continue
+            if not isinstance(item, dict):
+                continue
+            item_id = str(item.get("id") or item.get("item_id") or "").strip()
+            source_url = str(item.get("fonte_url") or item.get("source_url") or "").strip()
+            cache_key = f"{item_id}|{source_url}"
+            if item_id and source_url and cache_key not in self._enrichment_cache:
+                self._enrichment_cache.add(cache_key)
+                jobs.append(asyncio.to_thread(self.catalog.enrich_observed, item))
+        if jobs:
+            results = await asyncio.gather(*jobs, return_exceptions=True)
+            for result in results:
+                if isinstance(result, Exception):
+                    LOGGER.warning("arricchimento item non riuscito: %s", type(result).__name__)
 
     async def run(self) -> None:
         while True:
             try:
                 snapshot_event = publish_runtime_snapshot(self.adapter, self.bus, self.sessione)
                 snapshot = snapshot_event.dati
-                self._enrich_inventory(snapshot)
+                await self._enrich_inventory(snapshot)
                 trace_key = self._trace_key(snapshot)
                 if trace_key != self._last_trace_key:
-                    publish_runtime_trace(self.adapter, self.bus, self.sessione)
+                    _publish_trace_snapshot(snapshot, self.bus, self.sessione)
                     self._last_trace_key = trace_key
-            except Exception as exc:  # defensive boundary around optional live clients
+            except Exception:
+                LOGGER.exception("errore durante la sincronizzazione dashboard")
                 self.bus.publish(DashboardEvent(
                     tipo="errore_runtime",
                     sessione=self.sessione,
-                    dati={"messaggio": str(exc), "observation_only": True},
+                    dati={"messaggio": "errore durante la sincronizzazione del client", "observation_only": True},
                 ))
             await asyncio.sleep(self.interval_s)
 
