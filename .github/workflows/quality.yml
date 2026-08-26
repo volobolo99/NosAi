@@ -103,13 +103,13 @@ jobs:
         with:
           name: nosai-test-center-${{ github.sha }}
           path: .ci-test-center
-          if-no-artifact-found: warn
+          if-no-artifact-found: ignore
       - name: Download security evidence
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
         with:
           name: nosai-security-evidence-${{ github.sha }}
           path: .ci-security
-          if-no-artifact-found: warn
+          if-no-artifact-found: ignore
       - name: Merge security evidence into Test Center snapshot
         run: |
           set -euo pipefail
