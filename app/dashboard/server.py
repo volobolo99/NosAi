@@ -29,7 +29,7 @@ async def lifespan(_app: FastAPI):
     """Start and stop the optional runtime streamer using FastAPI lifespan."""
     global _streamer
     if _runtime_adapter is not None:
-        _streamer = RuntimeDashboardStreamer(_runtime_adapter, bus, interval_s=0.5)
+        _streamer = RuntimeDashboardStreamer(_runtime_adapter, bus, interval_s=0.5, catalog=_catalog)
         _streamer.start()
     try:
         yield
