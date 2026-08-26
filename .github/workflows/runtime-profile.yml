@@ -45,7 +45,8 @@ jobs:
         run: python tools/profile_runtime.py --output runtime_profile.json
 
       - name: Validate profile artifact
-        run: python - <<'PY'
+        run: |
+          python - <<'PY'
           import json
           from pathlib import Path
           p = Path('runtime_profile.json')
