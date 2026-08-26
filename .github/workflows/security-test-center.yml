@@ -1,6 +1,7 @@
 name: NosAi Security Evidence
 
 on:
+  workflow_call:
   push:
     branches: [main]
   pull_request:
