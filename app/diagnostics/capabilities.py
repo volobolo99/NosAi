@@ -22,14 +22,20 @@ class Capability:
 
 
 def _check_status(report: Any, name: str) -> str:
-    for check in getattr(report, "checks", ()):  # supports both diagnostic report contracts
+    for check in getattr(report, "checks", ()):
         check_name = getattr(check, "name", None) or getattr(check, "check_id", None)
         if check_name == name or name in str(check_name):
             return str(getattr(check, "status", "FAIL"))
     return "FAIL"
 
 
-def build_capability_matrix(report: Any, *, decode_ratio: float | None = None, benchmark_success_rate: float | None = None) -> list[Capability]:
+def build_capability_matrix(
+    report: Any,
+    *,
+    fixture_integrity_ok: bool | None = None,
+    decode_ratio: float | None = None,
+    benchmark_success_rate: float | None = None,
+) -> list[Capability]:
     def module_ready(name: str) -> bool:
         return _check_status(report, name) == "PASS"
 
@@ -40,6 +46,8 @@ def build_capability_matrix(report: Any, *, decode_ratio: float | None = None, b
         Capability("skill_ledger", CapabilityStatus.READY if module_ready("skill_ledger") else CapabilityStatus.BLOCKED, "skill verification", True),
         Capability("simulation", CapabilityStatus.READY if module_ready("simulation_executor") else CapabilityStatus.BLOCKED, "safe simulation", True),
     ]
+    if fixture_integrity_ok is not None:
+        capabilities.append(Capability("replay_integrity", CapabilityStatus.READY if fixture_integrity_ok else CapabilityStatus.BLOCKED, "fixture/replay evidence integrity", True))
     if decode_ratio is not None:
         status = CapabilityStatus.READY if decode_ratio >= 0.95 else CapabilityStatus.PARTIAL if decode_ratio >= 0.80 else CapabilityStatus.BLOCKED
         capabilities.append(Capability("decoder_coverage", status, f"decode_ratio={decode_ratio:.3f}", status == CapabilityStatus.BLOCKED))
@@ -50,5 +58,5 @@ def build_capability_matrix(report: Any, *, decode_ratio: float | None = None, b
 
 
 def autonomous_ready(capabilities: Iterable[Capability]) -> bool:
-    caps = list(capabilities)
-    return bool(caps) and all(c.status == CapabilityStatus.READY for c in caps if c.critical)
+    critical = [c for c in capabilities if c.critical]
+    return bool(critical) and all(c.status == CapabilityStatus.READY for c in critical)
