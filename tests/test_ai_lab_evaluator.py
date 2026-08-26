@@ -40,11 +40,11 @@ def test_evaluator_marks_missing_decision_not_run():
 
 def test_scenario_validation_reports_missing_fields():
     assert validate_scenario({}) == (
-        "available_actions:list",
         "available_actions",
         "constraints",
         "scenario_id",
         "schema_version",
         "source",
         "world_state",
+        "available_actions:list",
     )
