@@ -1,0 +1,82 @@
+name: Security CI
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, 'feature/**', 'feat/**', 'fix/**', 'audit/**', 'ci/**']
+  schedule:
+    - cron: '17 3 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-security:
+    name: Python dependency + SAST audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Install security tooling
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'pip-audit>=2,<3' 'bandit>=1.7,<2'
+
+      - name: Audit Python dependencies
+        run: python -m pip_audit
+
+      - name: Run Bandit SAST
+        run: python -m bandit -r app -x tests -ll
+
+  workflow-security:
+    name: GitHub Actions security audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate workflow permissions and action pinning
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          workflow_dir = Path('.github/workflows')
+          failures = []
+          for path in sorted(workflow_dir.glob('*.yml')) + sorted(workflow_dir.glob('*.yaml')):
+              text = path.read_text(encoding='utf-8')
+              if 'permissions:' not in text:
+                  failures.append(f'{path}: missing top-level permissions')
+              for match in re.finditer(r'uses:\s*([^\s]+)', text):
+                  ref = match.group(1)
+                  if '@' not in ref:
+                      continue
+                  version = ref.rsplit('@', 1)[1]
+                  if re.fullmatch(r'v\d+(?:\.\d+){0,2}', version):
+                      failures.append(f'{path}: unpinned action {ref}')
+          if failures:
+              print('\n'.join(failures))
+              raise SystemExit(1)
+          print('Workflow security policy passed')
+          PY
