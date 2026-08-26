@@ -1,0 +1,37 @@
+{
+  "version": 1,
+  "purpose": "Public reference images for UI/ROI calibration only; never treated as production ground truth.",
+  "official_reference": "https://gameguide.nostale.it/main/game_interface",
+  "sources": [
+    {
+      "id": "ref_combat_01",
+      "url": "https://bananatic-15199.kxcdn.com/it/photos/bananapedia/3e0d0264d284d583f31ea4b6f2474fb6.jpg",
+      "source_page": "https://www.bananatic.com/it/giochi/nostale-200/come-fare-soldi-su-nostale-15436",
+      "tags": ["combat", "mob", "hud", "minimap"]
+    },
+    {
+      "id": "ref_world_01",
+      "url": "https://game-game.com/ui/css/images/upload/279/6b6c074985f241e5c5de9036c7979726_full.jpg",
+      "source_page": "https://game-game.com/online-nostale/",
+      "tags": ["world", "npc", "player", "minimap", "hud"]
+    },
+    {
+      "id": "ref_party_01",
+      "url": "https://cdn.kanobu.ru/screenshots/50/7d904434-5d02-4c16-8d12-d72721d93c83.webp",
+      "source_page": "https://kanobu.ru/games/nostale/",
+      "tags": ["world", "entities", "hud", "minimap"]
+    },
+    {
+      "id": "ref_legacy_01",
+      "url": "https://i1.ruliweb.com/img/4/E/6/2/4E626AB3344A7D05A0",
+      "source_page": "https://m.ruliweb.com/game/board/179147/read/2266010",
+      "tags": ["combat", "player", "pet", "hud", "minimap"]
+    }
+  ],
+  "policy": {
+    "reference_only": true,
+    "requires_local_capture_for_ground_truth": true,
+    "same_resolution_required_for_calibration_group": true,
+    "observation_only": true
+  }
+}
