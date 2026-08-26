@@ -1,6 +1,7 @@
 """FastAPI/WebSocket gateway for the NosAi observability dashboard."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -15,7 +16,7 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.3")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.4")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 _runtime_adapter: Any | None = None
@@ -26,6 +27,32 @@ def set_runtime_adapter(adapter: Any | None) -> None:
     """Attach the observation-only runtime/client adapter."""
     global _runtime_adapter
     _runtime_adapter = adapter
+
+
+def configure_nostale_observation() -> str:
+    """Attach the real Windows NosTale observer when explicitly enabled.
+
+    The observer is strictly read-only. It discovers a configured NosTale
+    process/window and exposes normalized metadata; it never sends input,
+    patches memory, injects code, or executes game actions.
+    """
+    global _runtime_adapter
+    enabled = os.getenv("NOSAI_NOSTALE_OBSERVATION", "1").strip().lower()
+    if enabled in {"0", "false", "no", "off"}:
+        return "disabled"
+    if os.name != "nt":
+        return "non-windows"
+    try:
+        from app.client.nostale_windows import WindowsNosTaleAdapter
+        _runtime_adapter = WindowsNosTaleAdapter()
+        return "ready"
+    except Exception:
+        # Dashboard remains usable even when the game is not installed/running.
+        _runtime_adapter = None
+        return "unavailable"
+
+
+configure_nostale_observation()
 
 
 @app.get("/")
@@ -61,7 +88,13 @@ def test_center_data() -> dict[str, Any]:
 @app.get("/api/stato")
 def stato() -> dict[str, Any]:
     if _runtime_adapter is None:
-        return {"stato": "pronto", "modalita": "sola osservazione", "connessione": "in attesa"}
+        return {
+            "connected": False,
+            "stato": "pronto",
+            "modalita": "sola osservazione",
+            "connessione": "in attesa",
+            "adapter": "nostale_windows" if os.name == "nt" else "non-windows",
+        }
     from .state import snapshot_from_adapter
     return snapshot_from_adapter(_runtime_adapter).to_dict()
 
