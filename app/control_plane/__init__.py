@@ -1,10 +1,11 @@
-"""Provider-neutral control-plane contracts for NosAi."""
+"""Provider-neutral control-plane package for NosAi."""
 
 from .contracts import (
     AgentExecutor,
     ArtifactStore,
     EvaluationResult,
     Evaluator,
+    InvalidRunTransition,
     KnowledgeStore,
     PromotionPolicy,
     RepositoryContextProvider,
@@ -17,6 +18,7 @@ from .contracts import (
     TestRunner,
     VerificationResult,
     Verifier,
+    transition_run,
 )
 
 __all__ = [
@@ -24,6 +26,7 @@ __all__ = [
     "ArtifactStore",
     "EvaluationResult",
     "Evaluator",
+    "InvalidRunTransition",
     "KnowledgeStore",
     "PromotionPolicy",
     "RepositoryContextProvider",
@@ -36,4 +39,5 @@ __all__ = [
     "TestRunner",
     "VerificationResult",
     "Verifier",
+    "transition_run",
 ]
