@@ -35,6 +35,7 @@ def build_capability_matrix(
     fixture_integrity_ok: bool | None = None,
     decode_ratio: float | None = None,
     benchmark_success_rate: float | None = None,
+    game_state_valid: bool | None = None,
 ) -> list[Capability]:
     def module_ready(name: str) -> bool:
         return _check_status(report, name) == "PASS"
@@ -51,6 +52,8 @@ def build_capability_matrix(
     if decode_ratio is not None:
         status = CapabilityStatus.READY if decode_ratio >= 0.95 else CapabilityStatus.PARTIAL if decode_ratio >= 0.80 else CapabilityStatus.BLOCKED
         capabilities.append(Capability("decoder_coverage", status, f"decode_ratio={decode_ratio:.3f}", True))
+    if game_state_valid is not None:
+        capabilities.append(Capability("game_state_integrity", CapabilityStatus.READY if game_state_valid else CapabilityStatus.BLOCKED, "GameState invariant validation", True))
     if benchmark_success_rate is not None:
         status = CapabilityStatus.READY if benchmark_success_rate >= 0.95 else CapabilityStatus.PARTIAL if benchmark_success_rate >= 0.80 else CapabilityStatus.BLOCKED
         capabilities.append(Capability("autonomy_benchmark", status, f"success_rate={benchmark_success_rate:.3f}", True))
