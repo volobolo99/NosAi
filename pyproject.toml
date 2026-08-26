@@ -7,6 +7,9 @@ name = "nos-ai-project"
 version = "4.19.2"
 description = "NosAi full-runtime fusion project"
 requires-python = ">=3.10"
+dependencies = [
+  "openai>=1.0",
+]
 
 [project.optional-dependencies]
 m1-learning = ["torch>=2.0"]
@@ -20,6 +23,7 @@ dev = [
   "ruff>=0.6,<1",
   "torch>=2.0",
   "numpy>=1.26,<3",
+  "openai>=1.0",
 ]
 
 [project.scripts]
