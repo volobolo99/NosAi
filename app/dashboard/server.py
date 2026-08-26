@@ -10,7 +10,7 @@ from .sources import all_sources, image_reference
 
 try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-    from fastapi.responses import FileResponse
+    from fastapi.responses import HTMLResponse, FileResponse
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
@@ -18,6 +18,7 @@ app = FastAPI(title="NosAi — Centro di controllo", version="1.2")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 _runtime_adapter: Any | None = None
+_TEST_NAV = '<a href="/test-center" style="display:block;color:#8fe3ff;text-decoration:none;padding:11px 12px;border-radius:10px">🧪 Test & verifica</a>'
 
 
 def set_runtime_adapter(adapter: Any | None) -> None:
@@ -27,8 +28,10 @@ def set_runtime_adapter(adapter: Any | None) -> None:
 
 
 @app.get("/")
-def home() -> FileResponse:
-    return FileResponse(WEB_ROOT / "index.html")
+def home() -> HTMLResponse:
+    html = (WEB_ROOT / "index.html").read_text(encoding="utf-8")
+    html = html.replace("</nav>", f"{_TEST_NAV}</nav>", 1)
+    return HTMLResponse(html)
 
 
 @app.get("/test-center")
