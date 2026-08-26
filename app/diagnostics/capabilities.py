@@ -1,11 +1,9 @@
-"""Capability matrix built from deterministic health checks and runtime contracts."""
+"""Capability matrix derived from deterministic diagnostics and benchmark evidence."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from enum import Enum
-from typing import Iterable
-
-from .startup_check import CheckResult, StartupReport
+from typing import Iterable, Any
 
 
 class CapabilityStatus(str, Enum):
@@ -23,18 +21,24 @@ class Capability:
     critical: bool = False
 
 
-def build_capability_matrix(report: StartupReport, *, decode_ratio: float | None = None, benchmark_success_rate: float | None = None) -> list[Capability]:
-    by_name = {check.name: check for check in report.checks}
+def _check_status(report: Any, name: str) -> str:
+    for check in getattr(report, "checks", ()):  # supports both diagnostic report contracts
+        check_name = getattr(check, "name", None) or getattr(check, "check_id", None)
+        if check_name == name or name in str(check_name):
+            return str(getattr(check, "status", "FAIL"))
+    return "FAIL"
 
+
+def build_capability_matrix(report: Any, *, decode_ratio: float | None = None, benchmark_success_rate: float | None = None) -> list[Capability]:
     def module_ready(name: str) -> bool:
-        return by_name.get(name, CheckResult(name, "FAIL", "missing check")).status == "PASS"
+        return _check_status(report, name) == "PASS"
 
     capabilities = [
-        Capability("network_observation", CapabilityStatus.READY if module_ready("network_observation") else CapabilityStatus.BLOCKED, "observation contract import", True),
-        Capability("game_state", CapabilityStatus.READY if module_ready("game_state") else CapabilityStatus.BLOCKED, "state model import", True),
-        Capability("decoder_registry", CapabilityStatus.READY if module_ready("decoder_registry") else CapabilityStatus.BLOCKED, "decoder infrastructure import", True),
-        Capability("skill_ledger", CapabilityStatus.READY if module_ready("skill_ledger") else CapabilityStatus.BLOCKED, "skill verification storage", True),
-        Capability("simulation", CapabilityStatus.READY if module_ready("simulation_executor") else CapabilityStatus.BLOCKED, "safe simulated execution", True),
+        Capability("network_observation", CapabilityStatus.READY if module_ready("network_observation") else CapabilityStatus.BLOCKED, "observation contract", True),
+        Capability("game_state", CapabilityStatus.READY if module_ready("game_state") else CapabilityStatus.BLOCKED, "state model", True),
+        Capability("decoder_registry", CapabilityStatus.READY if module_ready("decoder_registry") else CapabilityStatus.BLOCKED, "decoder infrastructure", True),
+        Capability("skill_ledger", CapabilityStatus.READY if module_ready("skill_ledger") else CapabilityStatus.BLOCKED, "skill verification", True),
+        Capability("simulation", CapabilityStatus.READY if module_ready("simulation_executor") else CapabilityStatus.BLOCKED, "safe simulation", True),
     ]
     if decode_ratio is not None:
         status = CapabilityStatus.READY if decode_ratio >= 0.95 else CapabilityStatus.PARTIAL if decode_ratio >= 0.80 else CapabilityStatus.BLOCKED
