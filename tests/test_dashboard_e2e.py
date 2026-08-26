@@ -51,8 +51,8 @@ def test_end_to_end_runtime_snapshot_and_m15_trace() -> None:
     assert snapshot.dati["tick"] == 42
     assert snapshot.dati["inventory"][0]["id"] == "gemma-1"
     assert len(trace) == 15
-    assert received[0]["tipo"] == "snapshot"
-    assert [event["dati"]["modulo"] for event in received[1:]] == [f"M{i}" for i in range(1, 16)]
+    assert received[0].tipo == "snapshot"
+    assert [event.dati["modulo"] for event in received[1:]] == [f"M{i}" for i in range(1, 16)]
 
 
 def test_nosapki_html_connector_extracts_safe_item_image() -> None:
@@ -69,3 +69,33 @@ def test_nosapki_connector_rejects_external_image() -> None:
     <meta property="og:image" content="https://evil.example/x.png">'''
     item = parse_item_html(html, "https://nosapki.com/it/items/example")
     assert item.immagine_url is None
+
+
+def test_gateway_http_and_websocket_end_to_end() -> None:
+    from fastapi.testclient import TestClient
+    from app.dashboard import server
+
+    server.set_runtime_adapter(FakeAdapter())
+    with TestClient(server.app) as client:
+        response = client.get("/api/stato")
+        assert response.status_code == 200
+        assert response.json()["tick"] == 42
+        assert response.json()["inventory"][0]["id"] == "gemma-1"
+
+        sources = client.get("/api/fonti")
+        assert sources.status_code == 200
+        assert sources.json()["oggetti_vendita"].startswith("https://nosapki.com/")
+
+        with client.websocket_connect("/ws") as websocket:
+            assert websocket.receive_json()["tipo"] == "connessione"
+            event = server.DashboardEventBus if False else None
+            server.bus.publish(
+                __import__("app.dashboard.events", fromlist=["DashboardEvent"]).DashboardEvent(
+                    tipo="decisione", sessione="e2e", dati={"confidence": 0.91}
+                )
+            )
+            received = websocket.receive_json()
+            assert received["tipo"] == "decisione"
+            assert received["dati"]["confidence"] == 0.91
+
+        server.set_runtime_adapter(None)
