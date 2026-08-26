@@ -10,13 +10,16 @@ requires-python = ">=3.10"
 
 [project.optional-dependencies]
 m1-learning = ["torch>=2.0"]
+live-windows = ["Pillow>=10,<13"]
 test = [
   "pytest>=8,<9",
+  "pytest-cov>=5,<7",
   "torch>=2.0",
   "numpy>=1.26,<3",
 ]
 dev = [
   "pytest>=8,<9",
+  "pytest-cov>=5,<7",
   "ruff>=0.6,<1",
   "torch>=2.0",
   "numpy>=1.26,<3",
@@ -27,6 +30,7 @@ nosai-preflight = "app.preflight:main"
 nosai-pilot = "app.pilot.cli:main"
 nosai-pilot-cycle = "app.pilot.cli:main"
 nosai-client-probe = "app.client.live_probe_cli:main"
+nosai-live-pilot = "app.client.live_pilot_cli:main"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
