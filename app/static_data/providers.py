@@ -38,4 +38,6 @@ class HTTPDataProvider:
             value = self._fetcher(dataset, self._config.timeout_seconds)
         except Exception as exc:
             raise ProviderError(f"HTTP provider failed for dataset '{dataset}'") from exc
+        if value is None:
+            raise ProviderError(f"HTTP provider returned no data for '{dataset}'")
         return value
