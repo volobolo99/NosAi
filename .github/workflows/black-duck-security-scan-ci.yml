@@ -11,10 +11,11 @@ on:
   schedule:
     - cron: '36 19 * * 3'
 
+permissions:
+  contents: read
+
 jobs:
   build:
-    # Enable by setting repository variable BLACKDUCK_ENABLED=true.
-    # Without configured vendor credentials, the security scan must not fail CI.
     if: ${{ vars.BLACKDUCK_ENABLED == 'true' }}
     runs-on: ubuntu-latest
     permissions:
@@ -22,10 +23,9 @@ jobs:
       pull-requests: write
       security-events: write
       actions: read
-
     steps:
       - name: Checkout source
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Black Duck security scan
         uses: blackduck-inc/black-duck-security-scan@805cbd09e806b01907bbea0f990723c2bb85abe9
         with:
