@@ -1,11 +1,8 @@
-"""Read-only network observation contracts for NosTale telemetry.
-
-The adapter accepts already-observed packet records and never sends, mutates,
-or injects network traffic. Decoding is deliberately separated from policy.
-"""
+"""Read-only network observation contracts for NosTale telemetry."""
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 import json
 from pathlib import Path
 from typing import Iterable, Mapping
@@ -25,6 +22,11 @@ class NetworkObservation:
             raise ValueError("direction must be 'recv' or 'send'")
         if not self.header.strip():
             raise ValueError("header must not be empty")
+
+    @property
+    def observation_id(self) -> str:
+        raw = f"{self.timestamp_ms}|{self.direction}|{self.header}|{self.payload}|{self.source}|{self.schema_version}".encode()
+        return hashlib.sha256(raw).hexdigest()[:16]
 
 
 def observation_from_mapping(record: Mapping[str, object]) -> NetworkObservation:
