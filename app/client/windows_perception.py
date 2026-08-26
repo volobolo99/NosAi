@@ -2,8 +2,7 @@
 
 This module deliberately performs screen capture only. It does not inject
 input, patch process memory, or execute game actions. OCR/object detection can
-be layered on top of the returned frame later without changing the safety
-boundary.
+be layered on top of the returned frame without changing the safety boundary.
 """
 from __future__ import annotations
 
@@ -11,6 +10,7 @@ import os
 from dataclasses import dataclass
 
 from .nostale_windows import NosTaleClientError, WindowsNosTaleAdapter
+from .multi_entity import MultiEntityObservation, MultiEntityRecognizer
 
 
 @dataclass(frozen=True)
@@ -23,7 +23,7 @@ class Frame:
 
 
 class WindowsNosTalePerception:
-    """Capture the visible NosTale window using the existing read-only adapter."""
+    """Capture and optionally recognize the visible NosTale window read-only."""
 
     def __init__(self, adapter: WindowsNosTaleAdapter | None = None) -> None:
         self.adapter = adapter or WindowsNosTaleAdapter()
@@ -62,3 +62,20 @@ class WindowsNosTalePerception:
             width=int(bgr.shape[1]),
             height=int(bgr.shape[0]),
         )
+
+    def capture_and_recognize(
+        self, recognizer: MultiEntityRecognizer
+    ) -> tuple[Frame, MultiEntityObservation]:
+        """Capture one real frame and return observation-only entity results."""
+        frame = self.capture()
+        try:
+            import cv2
+            import numpy as np
+        except ImportError as exc:
+            raise NosTaleClientError(
+                "Visual recognition requires the 'vision' optional dependencies"
+            ) from exc
+        image = cv2.imdecode(np.frombuffer(frame.png, dtype=np.uint8), cv2.IMREAD_COLOR)
+        if image is None:
+            raise NosTaleClientError("cannot decode captured NosTale screenshot")
+        return frame, recognizer.recognize(image)
