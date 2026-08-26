@@ -1,8 +1,9 @@
-"""Safe, local-only discovery of NosTale client asset families.
+"""Safe, local-only discovery and diagnostics for a NosTale client.
 
-The scanner never downloads or modifies game files. It inspects the user-selected
-client data directory and can optionally call an installed Taletool executable
-for format-aware classification. Proprietary extracted assets stay outside Git.
+The scanner never downloads or modifies game files. It inspects a user-selected
+client directory, identifies the executable/data root, inventories the asset
+families needed by the avatar/effect renderer, and optionally invokes an
+installed Taletool executable. Proprietary extracted assets stay outside Git.
 """
 from __future__ import annotations
 
@@ -14,7 +15,7 @@ import shutil
 import subprocess
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 FAMILY_PATTERNS: dict[str, tuple[str, ...]] = {
     "player_sprites": ("NSppData*.NOS",),
@@ -35,6 +36,16 @@ FAMILY_PATTERNS: dict[str, tuple[str, ...]] = {
     "geometry": ("NStgData*.NOS",),
 }
 
+REQUIRED_FAMILIES = {
+    "player_sprites",
+    "player_animations",
+    "player_remaps",
+    "player_index",
+    "effect_definitions",
+    "effect_texture_animation",
+    "effect_textures",
+}
+
 
 @dataclass(frozen=True)
 class AssetFile:
@@ -45,9 +56,23 @@ class AssetFile:
 
 
 @dataclass(frozen=True)
+class ClientDiagnostic:
+    selected_path: str
+    client_root: str
+    executable: str | None
+    data_root: str | None
+    files_found: int
+    families_present: tuple[str, ...]
+    families_missing: tuple[str, ...]
+    status: str
+    messages: tuple[str, ...]
+
+
+@dataclass(frozen=True)
 class ScannerReport:
     data_dir: str
     taletool: str | None
+    diagnostic: ClientDiagnostic
     files: tuple[AssetFile, ...]
     taletool_result: dict[str, Any] | None
 
@@ -55,19 +80,54 @@ class ScannerReport:
         return {
             "data_dir": self.data_dir,
             "taletool": self.taletool,
+            "diagnostic": asdict(self.diagnostic),
             "files": [asdict(item) for item in self.files],
             "taletool_result": self.taletool_result,
         }
 
 
 class NosTaleAssetScanner:
-    """Discover only files needed by the NosAi avatar/effect renderer."""
+    """Discover and validate only the files needed by the NosAi renderer."""
 
-    def __init__(self, data_dir: str | Path, taletool: str | None = None) -> None:
-        self.data_dir = Path(data_dir).expanduser().resolve()
-        if not self.data_dir.is_dir():
-            raise FileNotFoundError(f"directory NosTale non trovata: {self.data_dir}")
+    def __init__(self, selected_path: str | Path, taletool: str | None = None) -> None:
+        self.selected_path = Path(selected_path).expanduser().resolve()
+        if not self.selected_path.is_dir():
+            raise FileNotFoundError(f"directory NosTale non trovata: {self.selected_path}")
+        self.client_root = self._find_client_root(self.selected_path)
+        self.data_dir = self._find_data_root(self.client_root)
+        self.executable = self._find_executable(self.client_root)
         self.taletool = taletool or shutil.which("taletool")
+
+    @staticmethod
+    def _find_client_root(selected: Path) -> Path:
+        """Accept either the client root or a nested data directory."""
+        if (selected / "NostaleData").is_dir() or any(selected.glob("NosTale*.exe")):
+            return selected
+        for candidate in (selected, *selected.parents):
+            if (candidate / "NostaleData").is_dir() or any(candidate.glob("NosTale*.exe")):
+                return candidate
+        return selected
+
+    @staticmethod
+    def _find_data_root(root: Path) -> Path | None:
+        candidates = [root / "NostaleData", root / "NostaleData" / "data"]
+        candidates.extend(path for path in root.iterdir() if path.is_dir() and path.name.lower() == "nostaledata")
+        for candidate in candidates:
+            if candidate.is_dir():
+                return candidate
+        return root if any(root.rglob("*.NOS")) else None
+
+    @staticmethod
+    def _find_executable(root: Path) -> str | None:
+        preferred = ("NosTaleClient.exe", "NosTale.exe", "Nostale.exe")
+        for name in preferred:
+            candidate = root / name
+            if candidate.is_file():
+                return os.fspath(candidate)
+        for candidate in sorted(root.glob("*.exe")):
+            if "nostale" in candidate.name.lower():
+                return os.fspath(candidate)
+        return None
 
     @staticmethod
     def _sha256(path: Path) -> str:
@@ -89,8 +149,9 @@ class NosTaleAssetScanner:
         return None
 
     def discover(self) -> tuple[AssetFile, ...]:
+        root = self.data_dir or self.client_root
         found: list[AssetFile] = []
-        for path in sorted(self.data_dir.rglob("*")):
+        for path in sorted(root.rglob("*")):
             if not path.is_file():
                 continue
             family = self._family_for(path.name)
@@ -98,7 +159,7 @@ class NosTaleAssetScanner:
                 continue
             found.append(
                 AssetFile(
-                    path=path.relative_to(self.data_dir).as_posix(),
+                    path=path.relative_to(root).as_posix(),
                     family=family,
                     size=path.stat().st_size,
                     sha256=self._sha256(path),
@@ -106,10 +167,38 @@ class NosTaleAssetScanner:
             )
         return tuple(found)
 
+    def diagnose(self, files: tuple[AssetFile, ...]) -> ClientDiagnostic:
+        present = tuple(sorted({item.family for item in files}))
+        missing = tuple(sorted(REQUIRED_FAMILIES - set(present)))
+        messages: list[str] = []
+        if self.executable:
+            messages.append("eseguibile NosTale rilevato")
+        else:
+            messages.append("eseguibile NosTale non trovato nella cartella selezionata")
+        if self.data_dir:
+            messages.append(f"radice dati rilevata: {self.data_dir}")
+        else:
+            messages.append("NostaleData non rilevata; analisi limitata alla cartella selezionata")
+        status = "pronto" if not missing else "incompleto"
+        if missing:
+            messages.append("famiglie asset richieste mancanti: " + ", ".join(missing))
+        return ClientDiagnostic(
+            selected_path=os.fspath(self.selected_path),
+            client_root=os.fspath(self.client_root),
+            executable=self.executable,
+            data_root=os.fspath(self.data_dir) if self.data_dir else None,
+            files_found=len(files),
+            families_present=present,
+            families_missing=missing,
+            status=status,
+            messages=tuple(messages),
+        )
+
     def inspect_with_taletool(self, timeout_s: float = 60.0) -> dict[str, Any] | None:
         if not self.taletool:
             return None
-        command = [self.taletool, "scan", "--data-dir", os.fspath(self.data_dir), "--json"]
+        root = self.data_dir or self.client_root
+        command = [self.taletool, "scan", "--data-dir", os.fspath(root), "--json"]
         try:
             completed = subprocess.run(
                 command,
@@ -134,10 +223,12 @@ class NosTaleAssetScanner:
         }
 
     def scan(self) -> ScannerReport:
+        files = self.discover()
         return ScannerReport(
-            data_dir=os.fspath(self.data_dir),
+            data_dir=os.fspath(self.data_dir or self.client_root),
             taletool=self.taletool,
-            files=self.discover(),
+            diagnostic=self.diagnose(files),
+            files=files,
             taletool_result=self.inspect_with_taletool(),
         )
 
