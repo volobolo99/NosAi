@@ -21,23 +21,27 @@ def publish_runtime_snapshot(adapter: Any, bus: DashboardEventBus, sessione: str
 def publish_runtime_trace(adapter: Any, bus: DashboardEventBus, sessione: str = "runtime") -> list[DashboardEvent]:
     """Publish a safe, structured decision trace for the M1-M15 pipeline.
 
-    If the runtime supplies ``trace``/``decision_trace`` in its normalized
-    decision payload, it is preserved as structured summaries. Otherwise the
-    bridge emits deterministic module checkpoints so the dashboard can still
-    visualize the complete pipeline.
+    Runtime-provided trace entries are marked as ``runtime``. Missing entries
+    are explicit ``non_disponibile`` placeholders and are never presented as
+    observations that came from the client.
     """
     snapshot = snapshot_from_adapter(adapter).to_dict()
     decision = snapshot.get("decision", {})
     supplied = decision.get("trace") or decision.get("decision_trace") or []
     events: list[DashboardEvent] = []
     for index in range(1, 16):
-        item = supplied[index - 1] if index <= len(supplied) else {"stato": "completato" if index < 15 else "in osservazione"}
-        if not isinstance(item, dict):
-            item = {"riepilogo": str(item)}
+        if index <= len(supplied):
+            item = supplied[index - 1]
+            if not isinstance(item, dict):
+                item = {"riepilogo": str(item)}
+            source = "runtime"
+        else:
+            item = {"stato": "non disponibile"}
+            source = "non_disponibile"
         event = DashboardEvent(
             tipo="traccia_modulo",
             sessione=sessione,
-            dati={"modulo": f"M{index}", "riepilogo": item},
+            dati={"modulo": f"M{index}", "riepilogo": item, "fonte_trace": source},
         )
         bus.publish(event)
         events.append(event)
