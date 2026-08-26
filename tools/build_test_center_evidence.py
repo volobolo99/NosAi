@@ -49,6 +49,17 @@ static = os.environ.get("STATIC_OUTCOME", "unknown")
 cli = os.environ.get("CLI_OUTCOME", "unknown")
 run_id = os.environ.get("GITHUB_RUN_ID")
 repository = os.environ.get("GITHUB_REPOSITORY")
+
+def normalize_outcome(value: str) -> str:
+    return "NOT_RUN" if value in {"skipped", "cancelled", "unknown", "not_run"} else value.upper()
+
+quality_status = normalize_outcome(quality)
+static_status = normalize_outcome(static)
+cli_status = normalize_outcome(cli)
+ci_status = "PASS" if all(value == "SUCCESS" for value in (quality_status, static_status, cli_status)) else (
+    "NOT_RUN" if "NOT_RUN" in (quality_status, static_status, cli_status) else "FAIL"
+)
+
 evidence = {
     "schema": 3,
     "commit": os.environ.get("GITHUB_SHA"),
@@ -57,10 +68,10 @@ evidence = {
     "ref": os.environ.get("GITHUB_REF_NAME"),
     "repository": repository,
     "ci": {
-        "status": "PASS" if quality == "success" and static == "success" and cli == "success" else "FAIL",
-        "quality": quality,
-        "static": static,
-        "cli": cli,
+        "status": ci_status,
+        "quality": quality_status,
+        "static": static_status,
+        "cli": cli_status,
         "e2e": "NOT_RUN",
     },
     "junit": junit,
