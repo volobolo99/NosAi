@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
+from .ci_evidence import load_ci_evidence
 from .events import DashboardEvent, DashboardEventBus
 from .observability import scan_repository
 from .sources import all_sources, image_reference
@@ -14,7 +15,7 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.2")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.3")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 _runtime_adapter: Any | None = None
@@ -41,7 +42,9 @@ def test_center() -> FileResponse:
 
 @app.get("/api/test-center")
 def test_center_data() -> dict[str, Any]:
-    return scan_repository()
+    data = scan_repository()
+    data["ci"] = load_ci_evidence()
+    return data
 
 
 @app.get("/api/stato")
