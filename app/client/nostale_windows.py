@@ -2,8 +2,8 @@
 
 The adapter deliberately stops at observation: it discovers a configured
 NosTale process, resolves its visible top-level window, and exposes normalized
-metadata. It never injects input, patches memory, opens a game-control
-transport, or executes an action.
+metadata plus optional screen pixels. It never injects input, patches memory,
+opens a game-control transport, or executes an action.
 """
 from __future__ import annotations
 
@@ -47,12 +47,7 @@ class WindowInfo:
 
 
 class WindowsNosTaleAdapter:
-    """Read-only adapter for a running NosTale Windows client.
-
-    Process names are configurable because Gameforge/Steam distributions can
-    differ. A connection is considered valid only when a matching process has
-    a visible window; merely finding a PID is not enough.
-    """
+    """Read-only adapter for a running NosTale Windows client."""
 
     DEFAULT_PROCESS_NAMES = ("NostaleClientX.exe", "NostaleClient.exe")
 
@@ -68,7 +63,6 @@ class WindowsNosTaleAdapter:
 
     @property
     def process_names(self) -> tuple[str, ...]:
-        """Return the normalized process allow-list."""
         return tuple(sorted(self._process_names))
 
     def _matching_pids(self) -> set[int]:
@@ -76,18 +70,14 @@ class WindowsNosTaleAdapter:
             return set()
         try:
             output = subprocess.check_output(
-                ["tasklist", "/FO", "CSV", "/NH"],
-                text=True,
-                encoding="utf-8",
-                errors="replace",
+                ["tasklist", "/FO", "CSV", "/NH"], text=True,
+                encoding="utf-8", errors="replace",
             )
         except (OSError, subprocess.SubprocessError) as exc:
             raise NosTaleClientError(f"cannot enumerate Windows processes: {exc}") from exc
-
         pids: set[int] = set()
         try:
-            rows = csv.reader(StringIO(output))
-            for fields in rows:
+            for fields in csv.reader(StringIO(output)):
                 if len(fields) < 2 or fields[0].strip().lower() not in self._process_names:
                     continue
                 try:
@@ -102,7 +92,6 @@ class WindowsNosTaleAdapter:
     def _windows_for_pids(pids: set[int]) -> list[WindowInfo]:
         if os.name != "nt" or not pids:
             return []
-
         user32 = ctypes.windll.user32
         windows: list[WindowInfo] = []
         enum_proc = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_void_p, ctypes.c_void_p)
@@ -120,16 +109,11 @@ class WindowsNosTaleAdapter:
             rect = ctypes.wintypes.RECT()
             if not user32.GetWindowRect(hwnd, ctypes.byref(rect)):
                 return True
-            windows.append(
-                WindowInfo(
-                    pid=int(pid.value),
-                    title=buffer.value,
-                    left=int(rect.left),
-                    top=int(rect.top),
-                    right=int(rect.right),
-                    bottom=int(rect.bottom),
-                )
-            )
+            windows.append(WindowInfo(
+                pid=int(pid.value), title=buffer.value,
+                left=int(rect.left), top=int(rect.top),
+                right=int(rect.right), bottom=int(rect.bottom),
+            ))
             return True
 
         user32.EnumWindows(enum_proc(callback), 0)
@@ -138,17 +122,17 @@ class WindowsNosTaleAdapter:
     def _find_windows(self) -> list[WindowInfo]:
         return self._windows_for_pids(self._matching_pids())
 
-    def check_connection(self) -> bool:
-        """Return whether a matching process currently has a visible window."""
-        return bool(self._find_windows())
-
-    def read_state(self) -> ClientState:
-        """Return a deterministic, non-invasive snapshot of client metadata."""
+    def _largest_window(self) -> WindowInfo:
         windows = self._find_windows()
         if not windows:
             raise NosTaleClientError("no visible NosTale client window found")
+        return max(windows, key=lambda item: (item.area, item.width, item.height))
 
-        window = max(windows, key=lambda item: (item.area, item.width, item.height))
+    def check_connection(self) -> bool:
+        return bool(self._find_windows())
+
+    def read_state(self) -> ClientState:
+        window = self._largest_window()
         return ClientState(
             tick=time.monotonic_ns(),
             payload={
@@ -157,22 +141,22 @@ class WindowsNosTaleAdapter:
                 "process_names": list(self.process_names),
                 "window_title": window.title,
                 "window_rect": {
-                    "left": window.left,
-                    "top": window.top,
-                    "right": window.right,
-                    "bottom": window.bottom,
-                    "width": window.width,
-                    "height": window.height,
+                    "left": window.left, "top": window.top,
+                    "right": window.right, "bottom": window.bottom,
+                    "width": window.width, "height": window.height,
                 },
                 "observation_only": True,
                 "action_transport": "disabled",
             },
         )
 
+    def capture_screen(self):
+        """Capture only the visible game window; no input or memory access."""
+        from .screen_observation import capture_window
+        return capture_window(self._largest_window())
+
     def validate_action(self, action: Any) -> bool:
-        """Accept only the adapter's explicit no-op validation sentinel."""
         return action is None
 
     def close(self) -> None:
-        """Release adapter resources; observation uses no persistent handles."""
         return None
