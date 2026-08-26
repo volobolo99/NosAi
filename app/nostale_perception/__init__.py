@@ -1,6 +1,8 @@
 """Read-only NosTale perception and GameState normalization layer."""
 
+from .annotator import annotate_replay
 from .calibration import BarCalibration, CalibrationProfile, PlayerUiCalibration, Roi
+from .capture_dataset import append_capture, append_ground_truth, capture_frames
 from .dataset import DatasetManifest, build_manifest, sha256_file, write_manifest
 from .evaluation import PerceptionEvaluation, evaluate
 from .gamestate import GameState, GameStateBuilder, PlayerState, WorldEntity
@@ -20,5 +22,6 @@ __all__ = [
     "PixelBarDetector", "WindowCandidate", "discover_windows", "WindowsFrameSource",
     "WindowsWindowTarget", "Win32WindowCaptureBackend", "FrameGroundTruth", "load_ground_truth",
     "NumericMetric", "numeric_metric", "classification_accuracy", "DatasetManifest", "build_manifest",
-    "sha256_file", "write_manifest", "PerceptionEvaluation", "evaluate",
+    "sha256_file", "write_manifest", "PerceptionEvaluation", "evaluate", "append_capture",
+    "append_ground_truth", "capture_frames", "annotate_replay",
 ]
