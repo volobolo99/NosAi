@@ -15,6 +15,7 @@ class VisualWorldState:
     hud: HudObservation | None
     entities: tuple[dict[str, Any], ...] = ()
     perception: dict[str, Any] | None = None
+    navigation: dict[str, Any] | None = None
     source: str = "windows_visual_perception"
     observation_only: bool = True
 
@@ -31,6 +32,7 @@ class VisualWorldState:
             },
             "entities": list(self.entities),
             "perception": self.perception,
+            "navigation": self.navigation,
             "source": self.source,
             "observation_only": self.observation_only,
         }
@@ -40,6 +42,7 @@ def from_client_state(
     state: ClientState,
     hud: HudObservation | None = None,
     perception: MultiEntityObservation | None = None,
+    navigation: dict[str, Any] | None = None,
 ) -> VisualWorldState:
     entities: tuple[dict[str, Any], ...] = ()
     perception_dict = None
@@ -55,4 +58,5 @@ def from_client_state(
         hud=hud,
         entities=entities,
         perception=perception_dict,
+        navigation=navigation,
     )
