@@ -1,4 +1,4 @@
-"""Stable ZMSIA Core contracts."""
+"""Stable ZMSIA Core contracts and orchestration entry points."""
 
 from .contracts import (
     Action,
@@ -14,6 +14,7 @@ from .contracts import (
     ToolResult,
 )
 from .providers import DecisionProvider, MockDecisionProvider
+from .safe_evaluation_orchestrator import SafeEvaluatedCycleResult, SafeEvaluatedZMSIAOrchestrator
 
 __all__ = [
     "Action",
@@ -26,6 +27,8 @@ __all__ = [
     "Observation",
     "Plan",
     "SafetyDecision",
+    "SafeEvaluatedCycleResult",
+    "SafeEvaluatedZMSIAOrchestrator",
     "State",
     "ToolRequest",
     "ToolResult",
