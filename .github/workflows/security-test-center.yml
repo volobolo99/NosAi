@@ -2,16 +2,9 @@ name: NosAi Security Evidence
 
 on:
   workflow_call:
-  push:
-    branches: [main]
-  pull_request:
 
 permissions:
   contents: read
-
-concurrency:
-  group: nosai-security-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 jobs:
   security-evidence:
@@ -71,7 +64,7 @@ jobs:
           sbom_exit = int(os.environ.get('SBOM_EXIT', '1'))
           evidence = {
               'schema': 1,
-              'status': 'PASS' if pip_check == 'success' and parse_ok and not vulns and sbom_exists else 'FAIL',
+              'status': 'PASS' if pip_check == 'success' and audit_exit == 0 and parse_ok and not vulns and sbom_exists and sbom_exit == 0 else 'FAIL',
               'pip_check': pip_check,
               'audit_exit': audit_exit,
               'sbom_exit': sbom_exit,
