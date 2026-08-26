@@ -7,6 +7,7 @@ from app.zmsia.core.providers import MockDecisionProvider
 
 
 def test_mock_orchestrator_completes_provider_neutral_cycle():
+    """The mock provider completes a full non-executing control-loop cycle."""
     orchestrator = ZMSIAOrchestrator(MockDecisionProvider())
     observation = Observation(
         observation_id="obs-1",
@@ -22,10 +23,11 @@ def test_mock_orchestrator_completes_provider_neutral_cycle():
     assert result.state.values["state"] == "idle"
     assert result.plan.goal_id == "default"
     assert result.decision.provider == "mock"
-    assert result.action.action_id == "noop"
+    assert result.action.action_type == "noop"
 
 
 def test_m1_state_and_action_adapters_preserve_domain_data():
+    """M1 adapters preserve state data and produce an explicit action type."""
     m1_state = M1State(
         features={"hp": 100},
         timestamp=123,
@@ -41,11 +43,13 @@ def test_m1_state_and_action_adapters_preserve_domain_data():
     assert state.source_observation_ids == ("obs-1",)
     assert state.confidence == 0.8
     assert action.action_id == "move"
+    assert action.action_type == "move"
     assert action.parameters == {"x": 10}
     assert action.decision_id == "decision-1"
 
 
 def test_m2_plan_adapter_normalizes_mapping_and_clamps_confidence():
+    """M2 mapping output is normalized and confidence is clamped to one."""
     plan = m2_plan_to_zmsia(
         {
             "id": "plan-7",
