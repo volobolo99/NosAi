@@ -1,7 +1,4 @@
-"""Integrity checks for JSONL network fixtures and replay inputs.
-
-Malformed evidence is reported rather than silently dropped or crashing runtime.
-"""
+"""Integrity checks for JSONL network fixtures and replay inputs."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -36,14 +33,13 @@ class ReplayIntegrityReport:
         return self.valid_observations / self.total_lines if self.total_lines else 0.0
 
 
-def validate_records(records: Iterable[Mapping[str, object]], *, path: str = "<memory>") -> tuple[ReplayIntegrityReport, list[NetworkObservation]]:
+def _validate_numbered_records(records: Iterable[tuple[int, Mapping[str, object]]], *, path: str) -> tuple[ReplayIntegrityReport, list[NetworkObservation]]:
     report = ReplayIntegrityReport(path=path)
     observations: list[NetworkObservation] = []
     seen: set[str] = set()
     previous_timestamp: int | None = None
 
-    for line_number, record in enumerate(records, start=1):
-        report.total_lines += 1
+    for line_number, record in records:
         try:
             observation = observation_from_mapping(record)
         except (KeyError, TypeError, ValueError, OverflowError) as exc:
@@ -68,6 +64,13 @@ def validate_records(records: Iterable[Mapping[str, object]], *, path: str = "<m
     return report, observations
 
 
+def validate_records(records: Iterable[Mapping[str, object]], *, path: str = "<memory>") -> tuple[ReplayIntegrityReport, list[NetworkObservation]]:
+    numbered = ((line, record) for line, record in enumerate(records, start=1))
+    report, observations = _validate_numbered_records(numbered, path=path)
+    report.total_lines = len(observations) + sum(1 for issue in report.issues if issue.code != "DUPLICATE") + report.duplicate_observations
+    return report, observations
+
+
 def validate_jsonl(path: str | Path) -> tuple[ReplayIntegrityReport, list[NetworkObservation]]:
     path = Path(path)
     if not path.exists():
@@ -77,7 +80,7 @@ def validate_jsonl(path: str | Path) -> tuple[ReplayIntegrityReport, list[Networ
     except (OSError, UnicodeError) as exc:
         return ReplayIntegrityReport(str(path), issues=[FixtureIssue(0, "READ_ERROR", repr(exc))]), []
 
-    records: list[Mapping[str, object]] = []
+    records: list[tuple[int, Mapping[str, object]]] = []
     syntax_issues: list[FixtureIssue] = []
     for line_number, line in enumerate(lines, start=1):
         if not line.strip():
@@ -91,9 +94,9 @@ def validate_jsonl(path: str | Path) -> tuple[ReplayIntegrityReport, list[Networ
         if not isinstance(value, dict):
             syntax_issues.append(FixtureIssue(line_number, "NOT_OBJECT", "JSON record must be an object"))
             continue
-        records.append(value)
+        records.append((line_number, value))
 
-    parsed, observations = validate_records(records, path=str(path))
-    parsed.total_lines = len(lines)
-    parsed.issues = syntax_issues + parsed.issues
-    return parsed, observations
+    report, observations = _validate_numbered_records(records, path=str(path))
+    report.total_lines = len(lines)
+    report.issues = syntax_issues + report.issues
+    return report, observations
