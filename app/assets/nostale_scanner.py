@@ -3,7 +3,7 @@
 The scanner never downloads or modifies game files. It inspects a user-selected
 client directory, identifies the executable/data root, inventories the asset
 families needed by the avatar/effect renderer, and optionally invokes an
-installed Taletool executable. Proprietary extracted assets stay outside Git.
+installed Taletool executable.
 """
 from __future__ import annotations
 
@@ -37,13 +37,7 @@ FAMILY_PATTERNS: dict[str, tuple[str, ...]] = {
 }
 
 REQUIRED_FAMILIES = {
-    "player_sprites",
-    "player_animations",
-    "player_remaps",
-    "player_index",
-    "effect_definitions",
-    "effect_texture_animation",
-    "effect_textures",
+    "player_sprites", "player_animations", "player_remaps", "player_index",
 }
 
 
@@ -87,7 +81,7 @@ class ScannerReport:
 
 
 class NosTaleAssetScanner:
-    """Discover and validate only the files needed by the NosAi renderer."""
+    """Discover and validate only files needed by the NosAi renderer."""
 
     def __init__(self, selected_path: str | Path, taletool: str | None = None) -> None:
         self.selected_path = Path(selected_path).expanduser().resolve()
@@ -100,7 +94,6 @@ class NosTaleAssetScanner:
 
     @staticmethod
     def _find_client_root(selected: Path) -> Path:
-        """Accept either the client root or a nested data directory."""
         if (selected / "NostaleData").is_dir() or any(selected.glob("NosTale*.exe")):
             return selected
         for candidate in (selected, *selected.parents):
@@ -119,8 +112,7 @@ class NosTaleAssetScanner:
 
     @staticmethod
     def _find_executable(root: Path) -> str | None:
-        preferred = ("NosTaleClient.exe", "NosTale.exe", "Nostale.exe")
-        for name in preferred:
+        for name in ("NosTaleClient.exe", "NosTale.exe", "Nostale.exe"):
             candidate = root / name
             if candidate.is_file():
                 return os.fspath(candidate)
@@ -157,41 +149,21 @@ class NosTaleAssetScanner:
             family = self._family_for(path.name)
             if family is None:
                 continue
-            found.append(
-                AssetFile(
-                    path=path.relative_to(root).as_posix(),
-                    family=family,
-                    size=path.stat().st_size,
-                    sha256=self._sha256(path),
-                )
-            )
+            found.append(AssetFile(path.relative_to(root).as_posix(), family, path.stat().st_size, self._sha256(path)))
         return tuple(found)
 
     def diagnose(self, files: tuple[AssetFile, ...]) -> ClientDiagnostic:
         present = tuple(sorted({item.family for item in files}))
         missing = tuple(sorted(REQUIRED_FAMILIES - set(present)))
-        messages: list[str] = []
-        if self.executable:
-            messages.append("eseguibile NosTale rilevato")
-        else:
-            messages.append("eseguibile NosTale non trovato nella cartella selezionata")
-        if self.data_dir:
-            messages.append(f"radice dati rilevata: {self.data_dir}")
-        else:
-            messages.append("NostaleData non rilevata; analisi limitata alla cartella selezionata")
-        status = "pronto" if not missing else "incompleto"
+        messages = []
+        messages.append("eseguibile NosTale rilevato" if self.executable else "eseguibile NosTale non trovato nella cartella selezionata")
+        messages.append(f"radice dati rilevata: {self.data_dir}" if self.data_dir else "NostaleData non rilevata")
         if missing:
             messages.append("famiglie asset richieste mancanti: " + ", ".join(missing))
         return ClientDiagnostic(
-            selected_path=os.fspath(self.selected_path),
-            client_root=os.fspath(self.client_root),
-            executable=self.executable,
-            data_root=os.fspath(self.data_dir) if self.data_dir else None,
-            files_found=len(files),
-            families_present=present,
-            families_missing=missing,
-            status=status,
-            messages=tuple(messages),
+            os.fspath(self.selected_path), os.fspath(self.client_root), self.executable,
+            os.fspath(self.data_dir) if self.data_dir else None, len(files), present, missing,
+            "pronto" if not missing else "incompleto", tuple(messages)
         )
 
     def inspect_with_taletool(self, timeout_s: float = 60.0) -> dict[str, Any] | None:
@@ -200,37 +172,18 @@ class NosTaleAssetScanner:
         root = self.data_dir or self.client_root
         command = [self.taletool, "scan", "--data-dir", os.fspath(root), "--json"]
         try:
-            completed = subprocess.run(
-                command,
-                check=False,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                errors="replace",
-                timeout=timeout_s,
-            )
+            completed = subprocess.run(command, check=False, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=timeout_s)
         except (OSError, subprocess.SubprocessError) as exc:
             return {"ok": False, "errore": str(exc)}
         try:
             payload = json.loads(completed.stdout) if completed.stdout.strip() else None
         except json.JSONDecodeError:
             payload = None
-        return {
-            "ok": completed.returncode == 0,
-            "returncode": completed.returncode,
-            "risultato": payload,
-            "stderr": completed.stderr[-4000:],
-        }
+        return {"ok": completed.returncode == 0, "returncode": completed.returncode, "risultato": payload, "stderr": completed.stderr[-4000:]}
 
     def scan(self) -> ScannerReport:
         files = self.discover()
-        return ScannerReport(
-            data_dir=os.fspath(self.data_dir or self.client_root),
-            taletool=self.taletool,
-            diagnostic=self.diagnose(files),
-            files=files,
-            taletool_result=self.inspect_with_taletool(),
-        )
+        return ScannerReport(os.fspath(self.data_dir or self.client_root), self.taletool, self.diagnose(files), files, self.inspect_with_taletool())
 
 
 def report_json(report: ScannerReport) -> str:
