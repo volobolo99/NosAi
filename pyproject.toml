@@ -42,6 +42,7 @@ nosai-pilot-cycle = "app.pilot.cli:main"
 nosai-client-probe = "app.client.live_probe_cli:main"
 nosai-diagnostics = "app.diagnostics.cli:main"
 nosai-dashboard = "app.dashboard.cli:main"
+nosai-assets-scan = "app.assets.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
