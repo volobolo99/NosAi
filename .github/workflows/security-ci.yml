@@ -25,10 +25,10 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
         with:
           python-version: '3.11'
           cache: pip
@@ -52,7 +52,7 @@ jobs:
       contents: read
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
 
       - name: Validate workflow permissions and action pinning
         shell: bash
@@ -73,8 +73,8 @@ jobs:
                   if '@' not in ref:
                       continue
                   version = ref.rsplit('@', 1)[1]
-                  if re.fullmatch(r'v\d+(?:\.\d+){0,2}', version):
-                      failures.append(f'{path}: unpinned action {ref}')
+                  if not re.fullmatch(r'[0-9a-fA-F]{40}', version):
+                      failures.append(f'{path}: action is not pinned to a full commit SHA: {ref}')
           if failures:
               print('\n'.join(failures))
               raise SystemExit(1)
