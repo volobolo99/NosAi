@@ -1,4 +1,19 @@
 {
   "version": "0.1.0",
-  "packets": []
+  "packets": [
+    {"header":"c_info","direction":"unknown","kind":"character_info","schema_version":"unverified","confidence":0.35,"provenance":"NosTale-Anonymizer/NosSmooth reference","notes":"Header presence corroborated by public references; direction and field schema require real replay validation."},
+    {"header":"c_mode","direction":"unknown","kind":"character_mode","schema_version":"unverified","confidence":0.35,"provenance":"NosTale-Anonymizer/NosSmooth reference","notes":"Header presence corroborated by public references; direction and field schema require real replay validation."},
+    {"header":"cond","direction":"unknown","kind":"condition_state","schema_version":"unverified","confidence":0.35,"provenance":"NosTale-Anonymizer/NosSmooth reference","notes":"Header presence corroborated by public references; direction and field schema require real replay validation."},
+    {"header":"drop","direction":"unknown","kind":"drop","schema_version":"unverified","confidence":0.35,"provenance":"NosTale-Anonymizer/NosSmooth reference","notes":"Header presence corroborated by public references; direction and field schema require real replay validation."},
+    {"header":"gidx","direction":"unknown","kind":"entity_index","schema_version":"unverified","confidence":0.30,"provenance":"NosTale-Anonymizer/NosSmooth reference","notes":"Header presence corroborated by public references; semantics remain provisional."},
+    {"header":"in","direction":"unknown","kind":"entity_spawn","schema_version":"unverified","confidence":0.35,"provenance":"NosTale-Anonymizer/NosSmooth reference","notes":"Header presence corroborated by public references; direction and fields require real replay validation."},
+    {"header":"mv","direction":"unknown","kind":"movement","schema_version":"unverified","confidence":0.45,"provenance":"NosTale-Anonymizer/NosSmooth reference; public header catalog","notes":"Movement semantics are strongly suggested by public references, but exact fields/version must be validated."},
+    {"header":"out","direction":"unknown","kind":"entity_despawn","schema_version":"unverified","confidence":0.35,"provenance":"NosTale-Anonymizer/NosSmooth reference","notes":"Header presence corroborated by public references; exact semantics require replay validation."},
+    {"header":"pinit","direction":"unknown","kind":"player_init","schema_version":"unverified","confidence":0.35,"provenance":"NosTale-Anonymizer/NosSmooth reference","notes":"Header presence corroborated by public references; exact fields/version require replay validation."},
+    {"header":"revive","direction":"unknown","kind":"revive","schema_version":"unverified","confidence":0.45,"provenance":"NosTale-Anonymizer/NosSmooth reference; public header catalog","notes":"Semantic name is suggestive; exact direction and fields require replay validation."},
+    {"header":"st","direction":"unknown","kind":"state","schema_version":"unverified","confidence":0.30,"provenance":"NosTale-Anonymizer/NosSmooth reference","notes":"Generic state semantics remain provisional."},
+    {"header":"su","direction":"unknown","kind":"skill_or_status","schema_version":"unverified","confidence":0.30,"provenance":"NosTale-Anonymizer/NosSmooth reference","notes":"Semantics require replay validation."},
+    {"header":"u_p","direction":"unknown","kind":"player_update","schema_version":"unverified","confidence":0.35,"provenance":"NosTale-Anonymizer/NosSmooth reference","notes":"Header presence corroborated; exact fields/version require replay validation."},
+    {"header":"u_pet","direction":"unknown","kind":"pet_update","schema_version":"unverified","confidence":0.35,"provenance":"NosTale-Anonymizer/NosSmooth reference","notes":"Header presence corroborated; exact fields/version require replay validation."}
+  ]
 }
