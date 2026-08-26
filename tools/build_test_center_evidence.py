@@ -50,15 +50,23 @@ cli = os.environ.get("CLI_OUTCOME", "unknown")
 run_id = os.environ.get("GITHUB_RUN_ID")
 repository = os.environ.get("GITHUB_REPOSITORY")
 evidence = {
-    "schema": 2,
+    "schema": 3,
     "commit": os.environ.get("GITHUB_SHA"),
     "run_id": run_id,
     "workflow": os.environ.get("GITHUB_WORKFLOW"),
     "ref": os.environ.get("GITHUB_REF_NAME"),
     "repository": repository,
-    "ci": {"status": "PASS" if quality == "success" and static == "success" and cli == "success" else "FAIL", "quality": quality, "static": static, "cli": cli},
+    "ci": {
+        "status": "PASS" if quality == "success" and static == "success" and cli == "success" else "FAIL",
+        "quality": quality,
+        "static": static,
+        "cli": cli,
+        "e2e": "NOT_RUN",
+    },
     "junit": junit,
     "coverage": coverage,
+    "security": {"status": "NOT_RUN"},
+    "sbom": {"status": "NOT_RUN"},
     "artifact": {
         "name": f"nosai-test-center-{os.environ.get('GITHUB_SHA', 'unknown')}",
         "url": f"https://github.com/{repository}/actions/runs/{run_id}" if repository and run_id else None,
