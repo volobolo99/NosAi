@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Callable, Optional
 
-from .contracts import Action, Decision, Observation, State
+from .contracts import Action, Decision, Observation, Plan, State
 from .providers import DecisionProvider
 
 
@@ -11,43 +11,56 @@ from .providers import DecisionProvider
 class CycleResult:
     observation: Observation
     state: State
+    plan: Plan
     decision: Decision
     action: Action
 
 
 class ZMSIAOrchestrator:
-    """Small provider-neutral orchestration kernel.
+    """Provider-neutral planning/decision kernel.
 
-    The first implementation intentionally stops before execution. This keeps
-    the new Core safe and makes the complete observe -> decide path testable
-    without requiring the live client or external tools.
+    Execution is deliberately outside this class. The kernel can therefore be
+    exercised with deterministic providers before any live client integration.
     """
 
     def __init__(
         self,
         decision_provider: DecisionProvider,
+        plan_builder: Optional[Callable[[State], Plan]] = None,
         state_builder: Optional[Callable[[Observation], State]] = None,
     ) -> None:
         self._decision_provider = decision_provider
+        self._plan_builder = plan_builder or self._default_plan_builder
         self._state_builder = state_builder or self._default_state_builder
 
     def run_once(self, observation: Observation) -> CycleResult:
         state = self._state_builder(observation)
-        decision = self._decision_provider.decide(state)
-        action = decision.action
-        return CycleResult(
-            observation=observation,
-            state=state,
-            decision=decision,
-            action=action,
+        plan = self._plan_builder(state)
+        decision = self._decision_provider.decide(state=state, plan=plan)
+        action = Action(
+            action_id=decision.action_id,
+            parameters=dict(decision.parameters),
+            decision_id=decision.decision_id,
         )
+        return CycleResult(observation, state, plan, decision, action)
 
     @staticmethod
     def _default_state_builder(observation: Observation) -> State:
         return State(
-            schema_version=observation.schema_version,
             state_id=f"state:{observation.observation_id}",
-            timestamp=observation.timestamp,
-            values={"observation_id": observation.observation_id},
+            timestamp_ms=observation.timestamp_ms,
+            values=dict(observation.data),
             confidence=observation.confidence,
+            source_observation_ids=(observation.observation_id,),
+        )
+
+    @staticmethod
+    def _default_plan_builder(state: State) -> Plan:
+        return Plan(
+            plan_id=f"plan:{state.state_id}",
+            goal_id="default",
+            steps=("noop",),
+            rationale="Deterministic baseline plan.",
+            confidence=1.0,
+            provider="core-default",
         )
