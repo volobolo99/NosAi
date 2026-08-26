@@ -1,0 +1,64 @@
+"""Read-only visual perception for a real Windows NosTale window.
+
+This module deliberately performs screen capture only. It does not inject
+input, patch process memory, or execute game actions. OCR/object detection can
+be layered on top of the returned frame later without changing the safety
+boundary.
+"""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+
+from .nostale_windows import NosTaleClientError, WindowsNosTaleAdapter
+
+
+@dataclass(frozen=True)
+class Frame:
+    png: bytes
+    width: int
+    height: int
+    source: str = "windows_screen_capture"
+    observation_only: bool = True
+
+
+class WindowsNosTalePerception:
+    """Capture the visible NosTale window using the existing read-only adapter."""
+
+    def __init__(self, adapter: WindowsNosTaleAdapter | None = None) -> None:
+        self.adapter = adapter or WindowsNosTaleAdapter()
+
+    def capture(self) -> Frame:
+        if os.name != "nt":
+            raise NosTaleClientError("Windows visual perception requires Windows")
+        try:
+            import cv2
+            import mss
+            import numpy as np
+        except ImportError as exc:
+            raise NosTaleClientError(
+                "Visual perception requires the 'vision' optional dependencies"
+            ) from exc
+
+        state = self.adapter.read_state()
+        rect = state.payload["window_rect"]
+        monitor = {
+            "left": int(rect["left"]),
+            "top": int(rect["top"]),
+            "width": int(rect["width"]),
+            "height": int(rect["height"]),
+        }
+        if monitor["width"] <= 0 or monitor["height"] <= 0:
+            raise NosTaleClientError("NosTale window has an invalid capture rectangle")
+
+        with mss.mss() as sct:
+            raw = np.asarray(sct.grab(monitor))
+        bgr = cv2.cvtColor(raw, cv2.COLOR_BGRA2BGR)
+        ok, encoded = cv2.imencode(".png", bgr)
+        if not ok:
+            raise NosTaleClientError("cannot encode NosTale screenshot")
+        return Frame(
+            png=encoded.tobytes(),
+            width=int(bgr.shape[1]),
+            height=int(bgr.shape[0]),
+        )
