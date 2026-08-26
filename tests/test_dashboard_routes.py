@@ -27,13 +27,16 @@ def test_runtime_and_sources_api_are_safe_without_client() -> None:
     assert isinstance(sources.json(), dict)
 
 
-def test_ai_lab_is_offline_first() -> None:
+def test_ai_lab_is_offline_first_and_has_valid_scenarios() -> None:
     response = client.get("/api/ai-lab")
     assert response.status_code == 200
     data = response.json()
     assert data["status"] == "READY"
     assert data["mode"] == "offline-deterministic"
     assert data["external_provider"] == "NOT_REQUIRED"
+    assert data["scenarios"] == 4
+    assert data["results"]["NOT_RUN"] == 4
+    assert data["scenario_errors"] == []
 
 
 def test_websocket_connects() -> None:
