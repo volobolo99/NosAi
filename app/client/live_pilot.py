@@ -1,15 +1,13 @@
 """Gated first-contact pilot for a real NosTale Windows client.
 
-The pilot is deliberately conservative: observation and dataset collection are
-available by default; game input requires an explicit runtime arm flag. It
-captures the real client window, records normalized state/action/outcome
-telemetry, and exposes a small deterministic decision policy suitable for the
-first closed-loop smoke test.
+Observation and dataset collection are available by default; game input
+requires an explicit runtime arm flag. The pilot captures the real client
+window, records normalized state/action/outcome telemetry, and exposes a small
+deterministic decision policy for the first closed-loop smoke test.
 """
 from __future__ import annotations
 
 import ctypes
-import ctypes.wintypes
 import hashlib
 import json
 import os
@@ -18,7 +16,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Protocol
 
-from app.client.nostale_windows import NosTaleClientError, WindowInfo, WindowsNosTaleAdapter
+from app.client.nostale_windows import NosTaleClientError, WindowInfo
 
 
 class PilotError(RuntimeError):
@@ -44,14 +42,15 @@ class DecisionPolicy(Protocol):
     def choose(self, observation: PilotObservation) -> PilotAction: ...
 
 
-class ConservativeProbePolicy:
-    """Make only a tiny, deterministic probe decision after observation.
+class PilotAdapter(Protocol):
+    def check_connection(self) -> bool: ...
+    def read_state(self) -> Any: ...
+    def validate_action(self, action: Any) -> bool: ...
+    def find_windows(self) -> tuple[WindowInfo, ...]: ...
 
-    The first decision is always no-op. When actions are armed, subsequent
-    decisions alternate between short left/right probes. This is intentionally
-    not presented as learned gameplay: it exists to validate the full
-    observe -> decide -> act -> measure loop and generate training data.
-    """
+
+class ConservativeProbePolicy:
+    """Tiny deterministic probe used only to validate the closed loop."""
 
     def __init__(self) -> None:
         self._step = 0
@@ -65,7 +64,7 @@ class ConservativeProbePolicy:
 
 
 class JsonlTelemetryRecorder:
-    """Append-only telemetry store suitable for later replay/training."""
+    """Append-only telemetry store suitable for replay/training."""
 
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
@@ -110,7 +109,6 @@ def _capture_window(window: WindowInfo, output_dir: Path) -> tuple[str | None, s
         from PIL import ImageGrab
     except ImportError:
         return None, None
-
     output_dir.mkdir(parents=True, exist_ok=True)
     try:
         image = ImageGrab.grab(bbox=(window.left, window.top, window.right, window.bottom))
@@ -128,7 +126,7 @@ class LivePilot:
 
     def __init__(
         self,
-        adapter: WindowsNosTaleAdapter,
+        adapter: PilotAdapter,
         telemetry: JsonlTelemetryRecorder,
         policy: DecisionPolicy | None = None,
         input_controller: WindowsInputController | None = None,
@@ -149,7 +147,9 @@ class LivePilot:
         results: list[dict[str, Any]] = []
         for index in range(steps):
             state = self.adapter.read_state()
-            windows = self.adapter._find_windows()
+            windows = self.adapter.find_windows()
+            if not windows:
+                raise NosTaleClientError("NosTale client window disappeared during pilot")
             window = max(windows, key=lambda item: item.area)
             frame_path, frame_sha256 = _capture_window(window, self.frame_dir)
             observation = PilotObservation(time.time_ns(), state.payload, frame_path, frame_sha256)
