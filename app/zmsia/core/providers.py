@@ -1,9 +1,4 @@
-"""Provider interfaces for ZMSIA reasoning.
-
-The Core depends on this protocol, never on an SDK-specific implementation.
-A real OpenAI adapter can implement the same interface later; tests use the
-mock provider and remain deterministic/offline.
-"""
+"""Provider interfaces for ZMSIA reasoning."""
 
 from __future__ import annotations
 
@@ -19,7 +14,7 @@ class DecisionProvider(Protocol):
     name: str
 
     def decide(self, *, state: State, plan: Plan) -> Decision:
-        """Return a provider-neutral decision for the current state/plan."""
+        """Return a provider-neutral decision for the current state and plan."""
         ...
 
 
@@ -28,13 +23,15 @@ class MockDecisionProvider:
     """Deterministic provider for unit/integration tests and dry runs."""
 
     name: str = "mock"
-    action_id: str = "noop"
+    action_type: str = "noop"
 
     def decide(self, *, state: State, plan: Plan) -> Decision:
+        """Produce a deterministic action without external side effects."""
         return Decision(
             decision_id=f"mock:{state.state_id}:{plan.plan_id}",
             goal_id=plan.goal_id,
-            action_id=self.action_id,
+            action_id=f"mock-action:{state.state_id}:{plan.plan_id}",
+            action_type=self.action_type,
             parameters={},
             rationale="Deterministic mock decision; no external side effects.",
             confidence=1.0,
