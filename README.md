@@ -61,7 +61,23 @@ A non-zero exit means the client could not be observed successfully; it does not
 set NOSAI_NOSTALE_PROCESS_NAMES=NostaleClientX.exe;NostaleClient.exe
 ```
 
-The required generic adapter contract remains in `app/client/adapter.py`; the repository does not ship a fake live-client adapter.
+## Local NosTale asset scanner
+
+NosAi can inspect the **user's own local NosTale data directory** without downloading or modifying game assets. The scanner identifies the asset families required by the planned avatar/effect renderer, records file size and SHA-256, and can optionally invoke an installed `taletool` binary for format-aware classification.
+
+The scanner intentionally keeps proprietary client assets outside the repository. It records paths and metadata only; extraction/caching belongs to a later, separately tested stage.
+
+Example:
+
+```text
+nosai-assets-scan "C:\GameforgeLive\Nostale\NostaleData"
+```
+
+If `taletool` is installed on `PATH`, its JSON scan is included automatically. A custom executable can be supplied with `--taletool`.
+
+The scanner currently maps the renderer-critical families including player sprites (`NSppData`), player animations (`NSpcData`), player resource remaps (`NSpmData`), player index (`NSpnData`), effect definitions/animation/geometry/texture families, and monster/NPC resources.
+
+The format model is based on Taletool's documented NosTale structures: `NSpcData` supplies ordered player sprite animation frames, `NSpmData` remaps the eight player rendering resource slots, and `NSpnData` links player entries to animation/remap/resource keys.
 
 ## Development principles
 
@@ -71,6 +87,7 @@ The required generic adapter contract remains in `app/client/adapter.py`; the re
 4. Measure performance before optimizing it.
 5. Do not delete historical documentation or implementation evidence without proving it is redundant.
 6. Keep repository configuration single-sourced and reproducible.
+7. Never commit proprietary NosTale client archives or extracted assets.
 
 ## Current roadmap
 
@@ -78,7 +95,9 @@ The required generic adapter contract remains in `app/client/adapter.py`; the re
 2. Source quality and architecture audit. **In progress.**
 3. Establish the strict live-client adapter and integration contract. **In progress.**
 4. Validate real-client observation and visual/game-state perception. **Next.**
-5. Add a separately gated action transport only after observation is proven.
-6. Establish benchmark and regression baselines.
-7. Optimize measured bottlenecks.
-8. Release hardening.
+5. Discover and index local NosTale assets for the avatar/effect renderer. **Started.**
+6. Build the local 2.5D avatar/effect renderer and replay layer.
+7. Add a separately gated action transport only after observation is proven.
+8. Establish benchmark and regression baselines.
+9. Optimize measured bottlenecks.
+10. Release hardening.
