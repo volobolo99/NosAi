@@ -1,0 +1,13 @@
+{
+  "version": 1,
+  "mode": "weak_reference",
+  "policy": "Public references may calibrate stable UI regions, but cannot become Player/NPC/Mob ground truth.",
+  "templates": [],
+  "entity_classes": ["player", "npc", "mob"],
+  "requirements_for_entity_templates": {
+    "source": "local_capture",
+    "annotation": "human_or_verified_detector",
+    "minimum_confidence": 0.78,
+    "observation_only": true
+  }
+}
