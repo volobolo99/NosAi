@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 
 class Fetcher(Protocol):
@@ -38,6 +38,4 @@ class HTTPDataProvider:
             value = self._fetcher(dataset, self._config.timeout_seconds)
         except Exception as exc:
             raise ProviderError(f"HTTP provider failed for dataset '{dataset}'") from exc
-        if value is None:
-            raise ProviderError(f"HTTP provider returned no data for '{dataset}'")
         return value
