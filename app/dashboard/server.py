@@ -18,7 +18,7 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.8")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.9")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 ASSET_ROOT = WEB_ROOT / "assets"
@@ -118,19 +118,24 @@ def test_center_data() -> dict[str, Any]:
 @app.get("/api/ai-lab")
 def ai_lab_data() -> dict[str, Any]:
     """Return deterministic evaluation metadata without invoking an external model."""
+    from app.ai_lab.scenarios import default_scenarios, validate_scenarios
+
+    scenarios = default_scenarios()
+    errors = validate_scenarios(scenarios)
     return {
-        "status": "READY",
+        "status": "READY" if not errors else "INVALID",
         "mode": "offline-deterministic",
         "external_provider": "NOT_REQUIRED",
-        "scenarios": 0,
+        "scenarios": len(scenarios),
         "candidates": 0,
-        "results": {"PASS": 0, "FAIL": 0, "NOT_RUN": 0},
+        "results": {"PASS": 0, "FAIL": 0, "NOT_RUN": len(scenarios)},
         "metrics": {
             "accuracy_percent": None,
             "safety_violation_percent": None,
             "p50_latency_ms": None,
             "p95_latency_ms": None,
         },
+        "scenario_errors": errors,
         "evidence": None,
     }
 
