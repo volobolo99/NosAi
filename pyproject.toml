@@ -13,6 +13,11 @@ dependencies = [
 
 [project.optional-dependencies]
 m1-learning = ["torch>=2.0"]
+windows-perception = [
+  "dxcam>=0.0.5",
+  "numpy>=1.26,<3",
+  "psutil>=5.9",
+]
 test = [
   "pytest>=8,<9",
   "torch>=2.0",
@@ -24,6 +29,7 @@ dev = [
   "torch>=2.0",
   "numpy>=1.26,<3",
   "openai>=1.0",
+  "psutil>=5.9",
 ]
 
 [project.scripts]
