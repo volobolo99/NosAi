@@ -30,7 +30,8 @@ def fetch_json(url: str, *, timeout: float = 20.0) -> Any:
         url,
         headers={"Accept": "application/json", "User-Agent": "NosAi-static-importer/1"},
     )
-    with urllib.request.urlopen(request, timeout=timeout) as response:
+    # B310 is intentionally suppressed here because the URL scheme is validated immediately above.
+    with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310
         return json.load(response)
 
 
