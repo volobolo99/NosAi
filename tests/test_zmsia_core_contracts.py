@@ -16,7 +16,8 @@ def test_contracts_are_immutable_and_provider_neutral():
     assert isinstance(decision, Decision)
     assert decision.provider == "mock"
     assert decision.plan_id == "p1"
-    assert decision.action_id == "noop"
+    assert decision.action_type == "noop"
+    assert decision.action_id == "mock-action:s1:p1"
 
     try:
         state.state_id = "changed"  # type: ignore[misc]
