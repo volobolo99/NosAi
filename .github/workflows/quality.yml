@@ -27,8 +27,8 @@ jobs:
           python-version: '3.11'
           cache: pip
 
-      - name: Install package and test dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -e '.[test]'
+      - name: Install package and development test dependencies
+        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
 
       - name: Dependency integrity
         run: python -m pip check
@@ -73,8 +73,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install test dependencies
-        run: python -m pip install -e '.[test]'
+      - name: Install development test dependencies
+        run: python -m pip install -e '.[dev]'
 
       - name: Observation-only safety tests
         run: python -m pytest -q tests/test_ci_safety_contract.py tests/test_client_adapter.py tests/test_client_probe_runtime.py
@@ -93,8 +93,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install test dependencies
-        run: python -m pip install -e '.[test]'
+      - name: Install development test dependencies
+        run: python -m pip install -e '.[dev]'
 
       - name: Benchmark smoke tests
         run: python -m pytest -q tests/test_hardware_benchmark.py tests/benchmark
