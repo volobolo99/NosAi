@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "policy": "weak_hints_only",
+  "note": "Approximate boxes derived from public reference screenshots for candidate generation/review. They are not ground truth and must never directly drive actions.",
+  "sources": {
+    "ref_legacy_01": [
+      {"kind":"player","box":[0.42,0.42,0.20,0.24],"confidence":0.55},
+      {"kind":"pet","box":[0.48,0.48,0.18,0.18],"confidence":0.45}
+    ],
+    "ref_party_01": [
+      {"kind":"player","box":[0.32,0.48,0.20,0.24],"confidence":0.50},
+      {"kind":"mob","box":[0.12,0.34,0.18,0.18],"confidence":0.40},
+      {"kind":"mob","box":[0.24,0.36,0.18,0.18],"confidence":0.40}
+    ],
+    "ref_world_01": [
+      {"kind":"player","box":[0.48,0.50,0.14,0.20],"confidence":0.50},
+      {"kind":"npc","box":[0.45,0.38,0.16,0.20],"confidence":0.45}
+    ],
+    "ref_combat_01": [
+      {"kind":"player","box":[0.43,0.44,0.18,0.24],"confidence":0.55},
+      {"kind":"mob","box":[0.28,0.28,0.28,0.28],"confidence":0.45},
+      {"kind":"mob","box":[0.58,0.34,0.16,0.18],"confidence":0.40}
+    ]
+  }
+}
