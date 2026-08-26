@@ -1,9 +1,9 @@
 """Provider-neutral contracts for the ZMSIA control loop.
 
 These dataclasses are intentionally small, immutable and JSON-friendly. They
-are the boundary between the existing NosAi modules and future local/OpenAI
+form the boundary between the existing NosAi modules and future local/OpenAI
 providers. Domain-specific modules should adapt to these contracts instead of
-importing a provider implementation.
+importing provider implementations.
 """
 
 from __future__ import annotations
@@ -53,11 +53,12 @@ class Plan:
 
 @dataclass(frozen=True)
 class Decision:
-    """A proposed action decision before validation and safety checks."""
+    """Proposed action decision before validation and safety checks."""
 
     decision_id: str
     goal_id: str
     action_id: str
+    action_type: str
     parameters: dict[str, Any] = field(default_factory=dict)
     rationale: str = ""
     confidence: float = 0.0
@@ -68,9 +69,10 @@ class Decision:
 
 @dataclass(frozen=True)
 class Action:
-    """Validated executable intent; never represents an unchecked tool call."""
+    """Validated executable intent; never an unchecked tool call."""
 
     action_id: str
+    action_type: str
     parameters: dict[str, Any] = field(default_factory=dict)
     decision_id: str = ""
     schema_version: int = 1
@@ -82,7 +84,7 @@ class SafetyDecision:
 
     allowed: bool
     reason: str
-    policy_version: str
+    policy_version: str = "1"
     risk_score: float = 0.0
     required_mode: str = "safe"
     schema_version: int = 1
