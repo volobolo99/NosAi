@@ -18,11 +18,14 @@ class CatalogItem:
 
 
 class ItemCatalog:
-    """SQLite cache that enriches encountered items without requiring credentials."""
+    """SQLite cache that preserves known fields during partial enrichment."""
 
     def __init__(self, path: str | Path = "data/nosai_items.sqlite3") -> None:
         self.path = Path(path)
         self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._initialize()
+
+    def _initialize(self) -> None:
         with sqlite3.connect(self.path) as db:
             db.execute(
                 "CREATE TABLE IF NOT EXISTS items ("
@@ -33,11 +36,13 @@ class ItemCatalog:
         with sqlite3.connect(self.path) as db:
             db.execute(
                 "INSERT INTO items(item_id,nome,immagine_url,fonte_url) VALUES(?,?,?,?) "
-                "ON CONFLICT(item_id) DO UPDATE SET nome=excluded.nome, "
-                "immagine_url=excluded.immagine_url, fonte_url=excluded.fonte_url",
+                "ON CONFLICT(item_id) DO UPDATE SET "
+                "nome=COALESCE(excluded.nome, items.nome), "
+                "immagine_url=COALESCE(excluded.immagine_url, items.immagine_url), "
+                "fonte_url=excluded.fonte_url",
                 (item.item_id, item.nome, item.immagine_url, item.fonte_url),
             )
-        return item
+        return self.get(item.item_id) or item
 
     def get(self, item_id: str) -> CatalogItem | None:
         with sqlite3.connect(self.path) as db:
