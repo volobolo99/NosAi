@@ -5,8 +5,8 @@ from pathlib import Path
 from typing import Any
 
 from .events import DashboardEvent, DashboardEventBus
+from .observability import scan_repository
 from .sources import all_sources, image_reference
-from .state import DashboardState
 
 try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
@@ -14,7 +14,7 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.1")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.2")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 _runtime_adapter: Any | None = None
@@ -29,6 +29,16 @@ def set_runtime_adapter(adapter: Any | None) -> None:
 @app.get("/")
 def home() -> FileResponse:
     return FileResponse(WEB_ROOT / "index.html")
+
+
+@app.get("/test-center")
+def test_center() -> FileResponse:
+    return FileResponse(WEB_ROOT / "test_center.html")
+
+
+@app.get("/api/test-center")
+def test_center_data() -> dict[str, Any]:
+    return scan_repository()
 
 
 @app.get("/api/stato")
