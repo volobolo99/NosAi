@@ -1,3 +1,7 @@
+from dataclasses import FrozenInstanceError
+
+import pytest
+
 from app.ai.contracts import (
     CONTRACT_VERSION,
     ActionIntent,
@@ -26,6 +30,11 @@ def test_contracts_are_versioned_and_constructible():
     )
 
 
+def test_action_taxonomy_covers_existing_strategy_primitives():
+    assert {ActionKind.ATTACK, ActionKind.MOVE, ActionKind.HEAL,
+            ActionKind.RETREAT, ActionKind.WAIT}.issubset(set(ActionKind))
+
+
 def test_action_intent_is_not_an_execution_side_effect():
     intent = ActionIntent(ActionKind.ATTACK, parameters={"target_id": "x"})
     assert intent.kind is ActionKind.ATTACK
@@ -34,8 +43,6 @@ def test_action_intent_is_not_an_execution_side_effect():
 
 def test_world_state_is_immutable_at_decision_boundary():
     state = WorldState(timestamp=1.0, player_hp_ratio=0.5)
-    try:
+    with pytest.raises(FrozenInstanceError):
         state.player_hp_ratio = 0.2
-    except Exception:
-        pass
     assert state.player_hp_ratio == 0.5
