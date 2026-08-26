@@ -10,8 +10,8 @@ def test_replay_validation_builds_world_model() -> None:
     registry = DecoderRegistry()
     registry.register("mv", decode_mv)
     observations = [
-        NetworkObservation("o1", 1, "recv", "mv", b"10 20 42", "fixture", "1"),
-        NetworkObservation("o2", 2, "recv", "unknown", b"x", "fixture", "1"),
+        NetworkObservation(1, "recv", "mv", "10 20 42", "fixture", 1),
+        NetworkObservation(2, "recv", "unknown", "x", "fixture", 1),
     ]
     result, model = validate_replay(observations, registry)
     assert result.total == 2
