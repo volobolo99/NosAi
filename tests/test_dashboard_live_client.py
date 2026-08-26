@@ -20,7 +20,10 @@ class FakeClientAdapter:
 
     def read_state(self) -> ClientState:
         self.tick += 1
-        return ClientState(tick=self.tick, payload={"source": "test", "observation_only": True})
+        return ClientState(
+            tick=self.tick,
+            payload={"client": {"source": "test", "observation_only": True}},
+        )
 
     def validate_action(self, action):
         return action is None
@@ -41,9 +44,9 @@ def test_live_streamer_publishes_client_snapshots() -> None:
         bus.unsubscribe(queue)
         assert event.tipo == "snapshot"
         assert event.sessione == "e2e"
-        assert event.dati["client"]["payload"]["source"] == "test"
-        assert event.dati["client"]["payload"]["observation_only"] is True
-        assert not task.cancelled() or task.done()
+        assert event.dati["client"]["source"] == "test"
+        assert event.dati["client"]["observation_only"] is True
+        assert task.done()
 
     asyncio.run(scenario())
 
