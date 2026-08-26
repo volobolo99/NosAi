@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+import json
 import os
-import pickle
 import tempfile
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -81,28 +81,50 @@ class DataGateway:
         if self._cache_path is None or not self._cache_path.is_file():
             return {}
         try:
-            with self._cache_path.open("rb") as handle:
-                value = pickle.load(handle)
-            if not isinstance(value, dict):
+            with self._cache_path.open("r", encoding="utf-8") as handle:
+                payload = json.load(handle)
+            if not isinstance(payload, dict):
                 return {}
-            return {
-                key: entry
-                for key, entry in value.items()
-                if isinstance(key, str) and isinstance(entry, CacheEntry)
-            }
-        except (OSError, EOFError, pickle.PickleError, AttributeError, ValueError):
+            result: dict[str, CacheEntry] = {}
+            for key, raw in payload.items():
+                if not isinstance(key, str) or not isinstance(raw, dict):
+                    continue
+                timestamp = raw.get("fetched_at")
+                if not isinstance(timestamp, str):
+                    continue
+                try:
+                    fetched_at = datetime.fromisoformat(timestamp)
+                except ValueError:
+                    continue
+                result[key] = CacheEntry(
+                    value=raw.get("value"),
+                    fetched_at=fetched_at,
+                    source=str(raw.get("source", "")),
+                    version=raw.get("version") if isinstance(raw.get("version"), str) else None,
+                )
+            return result
+        except (OSError, json.JSONDecodeError, TypeError, ValueError):
             return {}
 
     def _save_cache(self) -> None:
         if self._cache_path is None:
             return
         self._cache_path.parent.mkdir(parents=True, exist_ok=True)
+        payload = {
+            key: {
+                "value": entry.value,
+                "fetched_at": entry.fetched_at.isoformat(),
+                "source": entry.source,
+                "version": entry.version,
+            }
+            for key, entry in self._cache.items()
+        }
         fd, temporary = tempfile.mkstemp(
             prefix=f".{self._cache_path.name}.", dir=self._cache_path.parent
         )
         try:
-            with os.fdopen(fd, "wb") as handle:
-                pickle.dump(self._cache, handle, protocol=pickle.HIGHEST_PROTOCOL)
+            with os.fdopen(fd, "w", encoding="utf-8") as handle:
+                json.dump(payload, handle, ensure_ascii=False, sort_keys=True)
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temporary, self._cache_path)
