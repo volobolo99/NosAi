@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, 'chore/**', 'feature/**', 'feat/**', 'fix/**', 'audit/**']
+    branches: [main, 'chore/**', 'feature/**', 'feat/**', 'fix/**', 'audit/**', 'ci/**']
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -19,6 +19,8 @@ jobs:
     name: Source regression gate
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    permissions:
+      contents: read
 
     steps:
       - name: Checkout
