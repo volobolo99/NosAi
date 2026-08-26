@@ -1,7 +1,4 @@
-"""Observational bridge from LearningLoop transitions into episodic memory.
-
-The bridge records experiences without changing action selection or execution.
-"""
+"""Observational bridge from LearningLoop transitions into episodic memory."""
 from __future__ import annotations
 
 import hashlib
@@ -20,18 +17,22 @@ def _fingerprint(state: Any) -> str:
 
 
 class LearningMemoryBridge:
-    """Translate generic learning transitions into bounded episodic records."""
+    """Translate learning transitions into bounded episodic records, read-only to control."""
 
     def __init__(self, memory, source: str = "learning_loop"):
         self.memory = memory
         self.source = source
 
     def record_transition(self, state, action, next_state, reward: float, done: bool) -> MemoryRecord:
-        kind = action if isinstance(action, ActionKind) else ActionKind(str(action)) if str(action) in {k.value for k in ActionKind} else ActionKind.NOOP
+        raw = action.value if isinstance(action, ActionKind) else str(action)
+        try:
+            kind = ActionKind(raw)
+        except ValueError:
+            kind = ActionKind.NOOP
         intent = ActionIntent(kind=kind, parameters={"raw_action": action}, source=self.source)
         goal = Goal(kind="episode_complete" if done else "progress", provenance=self.source)
         outcome = Outcome(status="success" if done else "ongoing", state_delta={"next_state": next_state})
         evidence = RewardEvidence(components={"total": float(reward)}, source=self.source)
         record = MemoryRecord(_fingerprint(state), goal, intent, outcome, evidence, provenance=self.source)
-        self.memory.add(record)
+        self.memory.append(record)
         return record
