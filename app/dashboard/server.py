@@ -13,12 +13,12 @@ from .sources import all_sources, image_reference
 
 try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-    from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
+    from fastapi.responses import FileResponse, StreamingResponse
     from fastapi.staticfiles import StaticFiles
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.6")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.7")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 ASSET_ROOT = WEB_ROOT / "assets"
@@ -70,7 +70,7 @@ def control_center() -> FileResponse:
 
 @app.get("/runtime")
 def runtime_page() -> FileResponse:
-    return _page("control_center.html")
+    return _page("runtime.html")
 
 
 @app.get("/game-view")
