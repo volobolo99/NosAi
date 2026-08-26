@@ -21,6 +21,10 @@ dev = [
   "torch>=2.0",
   "numpy>=1.26,<3",
 ]
+dashboard = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.30,<1",
+]
 
 [project.scripts]
 nosai-preflight = "app.preflight:main"
@@ -28,6 +32,7 @@ nosai-pilot = "app.pilot.cli:main"
 nosai-pilot-cycle = "app.pilot.cli:main"
 nosai-client-probe = "app.client.live_probe_cli:main"
 nosai-diagnostics = "app.diagnostics.cli:main"
+nosai-dashboard = "app.dashboard.cli:main"
 
 [tool.setuptools.packages.find]
 include = ["app*"]
