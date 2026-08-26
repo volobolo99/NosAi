@@ -3,7 +3,11 @@ from __future__ import annotations
 
 import ast
 import hashlib
+import json
 import os
+import urllib.request
+import zipfile
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree
@@ -30,41 +34,49 @@ def _parse(path: Path) -> tuple[ast.AST | None, str | None]:
         return None, f"{type(exc).__name__}: {exc}"
 
 
-def _junit() -> dict[str, Any]:
-    path = EVIDENCE_DIR / "test-results.xml"
-    if not path.exists():
-        return {"status": "NOT_RUN", "tests": 0, "failures": 0, "errors": 0, "skipped": 0, "duration": 0.0}
-    try:
-        root = ElementTree.parse(path).getroot()
-        attrs = root.attrib
-        return {"status": "PASS" if int(attrs.get("failures", 0)) == 0 and int(attrs.get("errors", 0)) == 0 else "FAIL", "tests": int(attrs.get("tests", 0)), "failures": int(attrs.get("failures", 0)), "errors": int(attrs.get("errors", 0)), "skipped": int(attrs.get("skipped", 0)), "duration": float(attrs.get("time", 0.0))}
-    except (ElementTree.ParseError, ValueError, OSError) as exc:
-        return {"status": "FAIL", "error": f"{type(exc).__name__}: {exc}"}
-
-
-def _coverage() -> dict[str, Any]:
-    path = EVIDENCE_DIR / "coverage.xml"
+def _read_evidence(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {"status": "NOT_RUN"}
     try:
-        root = ElementTree.parse(path).getroot()
-        line_rate = float(root.attrib.get("line-rate", 0.0))
-        branch_rate = root.attrib.get("branch-rate")
-        return {"status": "PASS", "line_rate": line_rate, "line_percent": round(line_rate * 100, 2), "branch_rate": float(branch_rate) if branch_rate is not None else None, "branch_percent": round(float(branch_rate) * 100, 2) if branch_rate is not None else None}
-    except (ElementTree.ParseError, ValueError, OSError) as exc:
-        return {"status": "FAIL", "error": f"{type(exc).__name__}: {exc}"}
-
-
-def _ci() -> dict[str, Any]:
-    path = EVIDENCE_DIR / "ci-status.json"
-    if not path.exists():
-        return {"status": "NOT_RUN"}
-    try:
-        import json
         data = json.loads(path.read_text(encoding="utf-8"))
-        return data if isinstance(data, dict) else {"status": "FAIL", "error": "ci-status.json is not an object"}
+        return data if isinstance(data, dict) else {"status": "FAIL", "error": "evidence is not an object"}
     except (OSError, ValueError) as exc:
         return {"status": "FAIL", "error": f"{type(exc).__name__}: {exc}"}
+
+
+def _remote_evidence() -> dict[str, Any]:
+    token = os.getenv("NOSAI_GITHUB_TOKEN")
+    repo = os.getenv("NOSAI_GITHUB_REPOSITORY", "volobolo99/NosAi")
+    if not token:
+        return {"status": "NOT_RUN", "error": "NOSAI_GITHUB_TOKEN not configured"}
+    try:
+        base = f"https://api.github.com/repos/{repo}/actions/artifacts?per_page=30"
+        req = urllib.request.Request(base, headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"})
+        with urllib.request.urlopen(req, timeout=10) as response:
+            listing = json.load(response)
+        artifacts = [a for a in listing.get("artifacts", []) if a.get("name", "").startswith("nosai-test-center-") and not a.get("expired")]
+        if not artifacts:
+            return {"status": "NOT_RUN", "error": "No Test Center artifact found"}
+        artifact = max(artifacts, key=lambda a: a.get("created_at", ""))
+        req = urllib.request.Request(artifact["archive_download_url"], headers={"Authorization": f"Bearer {token}", "Accept": "application/vnd.github+json", "X-GitHub-Api-Version": "2022-11-28"})
+        with urllib.request.urlopen(req, timeout=20) as response:
+            payload = response.read()
+        with zipfile.ZipFile(BytesIO(payload)) as archive:
+            with archive.open("test-center-evidence.json") as stream:
+                data = json.load(stream)
+        data["source"] = "github-artifact"
+        data["artifact"] = {"id": artifact.get("id"), "name": artifact.get("name"), "created_at": artifact.get("created_at"), "expired": artifact.get("expired")}
+        return data
+    except (OSError, ValueError, KeyError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
+        return {"status": "FAIL", "error": f"GitHub evidence fetch: {type(exc).__name__}: {exc}"}
+
+
+def ci_evidence() -> dict[str, Any]:
+    local = _read_evidence(EVIDENCE_DIR / "test-center-evidence.json")
+    if local.get("status") != "NOT_RUN":
+        local["source"] = "local"
+        return local
+    return _remote_evidence()
 
 
 def scan_repository() -> dict[str, Any]:
@@ -96,6 +108,6 @@ def scan_repository() -> dict[str, Any]:
         stem = Path(record["path"]).stem; parent = Path(record["path"]).parent.name
         record["tests"] = sorted({p.relative_to(ROOT).as_posix() for p in test_files if stem in p.stem or parent in p.parts})
     parsed = sum(r["parse"] == "PASS" for r in records); unsafe = [r["path"] for r in records if r["path"].startswith("app/ai/") and FORBIDDEN_AI_CALLS.intersection(r["calls"])]
-    junit, coverage, ci = _junit(), _coverage(), _ci()
-    gates = {"G0": "PASS" if records else "FAIL", "G1": "PASS" if records and parsed == len(records) else "FAIL", "G2": ci.get("static", "NOT_RUN"), "G3": junit["status"] if junit.get("status") != "NOT_RUN" else ("PASS" if test_files else "FAIL"), "G4": ci.get("e2e", "NOT_RUN"), "G5": "FAIL" if unsafe else "PASS", "G6": "PASS" if coverage.get("status") == "PASS" else "WARN"}
-    return {"root": str(ROOT), "files": records, "communications": edges, "errors": errors, "safety_violations": unsafe, "gates": gates, "ci": ci, "junit": junit, "coverage": coverage, "summary": {"files": len(records), "source_files": len(source_files), "test_files": len(test_files), "parse_failures": len(errors), "communication_edges": len(edges), "bytes": sum(r["bytes"] for r in records), "lines": sum(r["lines"] for r in records), "weight_flags": sum(bool(r["weight_flags"]) for r in records)}}
+    evidence = ci_evidence(); junit = evidence.get("junit", {}); coverage = evidence.get("coverage", {}); ci = evidence.get("ci", {})
+    gates = {"G0": "PASS" if records else "FAIL", "G1": "PASS" if records and parsed == len(records) else "FAIL", "G2": ci.get("static", "NOT_RUN"), "G3": junit.get("status", "NOT_RUN"), "G4": ci.get("e2e", "NOT_RUN"), "G5": "FAIL" if unsafe else "PASS", "G6": "PASS" if coverage.get("status") == "PASS" else "WARN"}
+    return {"root": str(ROOT), "files": records, "communications": edges, "errors": errors, "safety_violations": unsafe, "gates": gates, "ci": ci, "junit": junit, "coverage": coverage, "evidence": {k: evidence.get(k) for k in ("source", "artifact", "commit", "run_id", "workflow", "ref", "repository") if k in evidence}, "summary": {"files": len(records), "source_files": len(source_files), "test_files": len(test_files), "parse_failures": len(errors), "communication_edges": len(edges), "bytes": sum(r["bytes"] for r in records), "lines": sum(r["lines"] for r in records), "weight_flags": sum(bool(r["weight_flags"]) for r in records)}}
