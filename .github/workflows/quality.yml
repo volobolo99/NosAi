@@ -29,7 +29,9 @@ jobs:
           cache: pip
       - name: Install package and development test dependencies
         id: install
-        run: python -m pip install --upgrade pip && python -m pip install -e '.[dev]'
+        run: |
+          python -m pip install --upgrade pip 'setuptools>=83.0.0'
+          python -m pip install -e '.[dev]'
       - name: Dependency integrity
         id: dependency
         run: python -m pip check
@@ -76,7 +78,7 @@ jobs:
           retention-days: 30
       - name: Publish regression test results
         if: always()
-        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35c689e35e0d6874
+        uses: actions/upload-artifact@50769540e7f4bd5e21e526ee35e0d6874
         with:
           name: nosai-test-results-${{ github.sha }}
           path: test-results.xml
@@ -162,7 +164,9 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install development test dependencies
-        run: python -m pip install -e '.[dev]'
+        run: |
+          python -m pip install --upgrade pip 'setuptools>=83.0.0'
+          python -m pip install -e '.[dev]'
       - name: Observation-only safety tests
         run: python -m pytest -q tests/test_ci_safety_contract.py tests/test_client_adapter.py tests/test_client_probe_runtime.py
 
@@ -179,6 +183,8 @@ jobs:
         with:
           python-version: '3.11'
       - name: Install development test dependencies
-        run: python -m pip install -e '.[dev]'
+        run: |
+          python -m pip install --upgrade pip 'setuptools>=83.0.0'
+          python -m pip install -e '.[dev]'
       - name: Benchmark smoke tests
         run: python -m pytest -q tests/test_hardware_benchmark.py tests/benchmark
