@@ -1,6 +1,7 @@
 """FastAPI/WebSocket gateway for the NosAi observability dashboard."""
 from __future__ import annotations
 
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
 
@@ -16,7 +17,6 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.4")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 _runtime_adapter: Any | None = None
@@ -24,29 +24,31 @@ _streamer: RuntimeDashboardStreamer | None = None
 _catalog = ItemCatalog()
 
 
-def set_runtime_adapter(adapter: Any | None) -> None:
-    global _runtime_adapter
-    _runtime_adapter = adapter
-
-
-@app.on_event("startup")
-async def _start_runtime_stream() -> None:
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    """Start and stop the optional runtime streamer using FastAPI lifespan."""
     global _streamer
     if _runtime_adapter is not None:
         _streamer = RuntimeDashboardStreamer(_runtime_adapter, bus, interval_s=0.5)
         _streamer.start()
+    try:
+        yield
+    finally:
+        if _streamer is not None:
+            await _streamer.stop()
+            _streamer = None
+        if _runtime_adapter is not None:
+            close = getattr(_runtime_adapter, "close", None)
+            if callable(close):
+                close()
 
 
-@app.on_event("shutdown")
-async def _stop_runtime_stream() -> None:
-    global _streamer
-    if _streamer is not None:
-        await _streamer.stop()
-        _streamer = None
-    if _runtime_adapter is not None:
-        close = getattr(_runtime_adapter, "close", None)
-        if callable(close):
-            close()
+app = FastAPI(title="NosAi — Centro di controllo", version="1.4", lifespan=lifespan)
+
+
+def set_runtime_adapter(adapter: Any | None) -> None:
+    global _runtime_adapter
+    _runtime_adapter = adapter
 
 
 @app.get("/")
