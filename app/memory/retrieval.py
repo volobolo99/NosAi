@@ -20,10 +20,13 @@ class MemoryMatch:
 class MemoryRetriever:
     """Rank experiences using exact/structured signals only."""
 
-    def __init__(self, max_results: int = 5):
+    def __init__(self, max_results: int = 5, min_relevance: float = 0.25):
         if max_results < 1:
             raise ValueError("max_results must be >= 1")
+        if min_relevance < 0:
+            raise ValueError("min_relevance must be >= 0")
         self.max_results = max_results
+        self.min_relevance = min_relevance
 
     @staticmethod
     def _score(record: MemoryRecord, *, state_fingerprint: str | None, goal_kind: str | None, action_kind: str | None) -> MemoryMatch:
@@ -45,5 +48,6 @@ class MemoryRetriever:
 
     def retrieve(self, records: Iterable[MemoryRecord], *, state_fingerprint: str | None = None, goal_kind: str | None = None, action_kind: str | None = None) -> Sequence[MemoryMatch]:
         matches = [self._score(r, state_fingerprint=state_fingerprint, goal_kind=goal_kind, action_kind=action_kind) for r in records]
+        matches = [m for m in matches if any(r != "reward_signal" for r in m.reasons) and m.score >= self.min_relevance]
         matches.sort(key=lambda m: m.score, reverse=True)
         return tuple(matches[: self.max_results])
