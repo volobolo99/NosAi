@@ -43,10 +43,11 @@ jobs:
         run: python -c "import app; print('app import OK')"
       - name: Unit, contract and integration regression suite
         id: regression
+        if: steps.static.outcome == 'success'
         run: python -m pytest -q --maxfail=1 --junitxml=test-results.xml --cov=app --cov-report=term-missing --cov-report=xml
       - name: CLI smoke tests
         id: cli
-        if: always()
+        if: always() && steps.static.outcome == 'success'
         run: |
           nosai-preflight --help
           nosai-client-probe --help
@@ -56,9 +57,9 @@ jobs:
       - name: Build unified Test Center evidence
         if: always()
         env:
-          QUALITY_OUTCOME: ${{ steps.regression.outcome }}
-          STATIC_OUTCOME: ${{ steps.static.outcome }}
-          CLI_OUTCOME: ${{ steps.cli.outcome }}
+          QUALITY_OUTCOME: ${{ steps.regression.outcome || 'not_run' }}
+          STATIC_OUTCOME: ${{ steps.static.outcome || 'not_run' }}
+          CLI_OUTCOME: ${{ steps.cli.outcome || 'not_run' }}
           GITHUB_SHA: ${{ github.sha }}
           GITHUB_RUN_ID: ${{ github.run_id }}
           GITHUB_WORKFLOW: ${{ github.workflow }}
