@@ -18,12 +18,11 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.7")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.8")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 ASSET_ROOT = WEB_ROOT / "assets"
 _runtime_adapter: Any | None = None
-_TEST_NAV = '<a href="/test-center" style="display:block;color:#8fe3ff;text-decoration:none;padding:11px 12px;border-radius:10px">🧪 Test & verifica</a>'
 
 app.mount("/assets", StaticFiles(directory=ASSET_ROOT), name="dashboard-assets")
 
@@ -93,6 +92,11 @@ def test_center() -> FileResponse:
     return _page("test_center.html")
 
 
+@app.get("/ai-lab")
+def ai_lab_page() -> FileResponse:
+    return _page("ai_lab.html")
+
+
 @app.get("/api/test-center")
 def test_center_data() -> dict[str, Any]:
     data = scan_repository()
@@ -102,21 +106,33 @@ def test_center_data() -> dict[str, Any]:
     coverage = ci.get("coverage", {}) if isinstance(ci, dict) else {}
     security = ci.get("security", {}) if isinstance(ci, dict) else {}
     sbom = ci.get("sbom", {}) if isinstance(ci, dict) else {}
-    if junit.get("status") == "FAIL":
-        data["gates"]["G3"] = "FAIL"
-    elif junit.get("status") == "PASS":
-        data["gates"]["G3"] = "PASS"
-    elif junit.get("status") == "NOT_RUN":
-        data["gates"]["G3"] = "NOT_RUN"
-    if coverage.get("status") == "PASS":
-        data["gates"]["G6"] = "PASS"
-    elif coverage.get("status") == "FAIL":
-        data["gates"]["G6"] = "FAIL"
-    elif coverage.get("status") == "NOT_RUN":
-        data["gates"]["G6"] = "NOT_RUN"
+    if junit.get("status") in {"FAIL", "PASS", "NOT_RUN"}:
+        data["gates"]["G3"] = junit["status"]
+    if coverage.get("status") in {"PASS", "FAIL", "NOT_RUN"}:
+        data["gates"]["G6"] = coverage["status"]
     data["security"] = security
     data["sbom"] = sbom
     return data
+
+
+@app.get("/api/ai-lab")
+def ai_lab_data() -> dict[str, Any]:
+    """Return deterministic evaluation metadata without invoking an external model."""
+    return {
+        "status": "READY",
+        "mode": "offline-deterministic",
+        "external_provider": "NOT_REQUIRED",
+        "scenarios": 0,
+        "candidates": 0,
+        "results": {"PASS": 0, "FAIL": 0, "NOT_RUN": 0},
+        "metrics": {
+            "accuracy_percent": None,
+            "safety_violation_percent": None,
+            "p50_latency_ms": None,
+            "p95_latency_ms": None,
+        },
+        "evidence": None,
+    }
 
 
 @app.get("/api/stato")
