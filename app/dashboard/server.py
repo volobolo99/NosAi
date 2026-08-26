@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+from io import BytesIO
 from pathlib import Path
 from typing import Any
 
@@ -12,11 +13,11 @@ from .sources import all_sources, image_reference
 
 try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-    from fastapi.responses import HTMLResponse, FileResponse
+    from fastapi.responses import HTMLResponse, FileResponse, StreamingResponse
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.4")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.5")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 _runtime_adapter: Any | None = None
@@ -30,12 +31,7 @@ def set_runtime_adapter(adapter: Any | None) -> None:
 
 
 def configure_nostale_observation() -> str:
-    """Attach the real Windows NosTale observer when explicitly enabled.
-
-    The observer is strictly read-only. It discovers a configured NosTale
-    process/window and exposes normalized metadata; it never sends input,
-    patches memory, injects code, or executes game actions.
-    """
+    """Attach the real Windows NosTale observer when explicitly enabled."""
     global _runtime_adapter
     enabled = os.getenv("NOSAI_NOSTALE_OBSERVATION", "1").strip().lower()
     if enabled in {"0", "false", "no", "off"}:
@@ -47,7 +43,6 @@ def configure_nostale_observation() -> str:
         _runtime_adapter = WindowsNosTaleAdapter()
         return "ready"
     except Exception:
-        # Dashboard remains usable even when the game is not installed/running.
         _runtime_adapter = None
         return "unavailable"
 
@@ -97,6 +92,36 @@ def stato() -> dict[str, Any]:
         }
     from .state import snapshot_from_adapter
     return snapshot_from_adapter(_runtime_adapter).to_dict()
+
+
+@app.get("/api/perception")
+def perception() -> dict[str, Any]:
+    """Return metadata proving whether real visual perception is available."""
+    if _runtime_adapter is None:
+        return {"available": False, "reason": "runtime adapter unavailable"}
+    try:
+        from app.client.windows_perception import WindowsNosTalePerception
+        frame = WindowsNosTalePerception(_runtime_adapter).capture()
+        return {
+            "available": True,
+            "width": frame.width,
+            "height": frame.height,
+            "source": frame.source,
+            "observation_only": frame.observation_only,
+            "screenshot_url": "/api/screenshot",
+        }
+    except Exception as exc:
+        return {"available": False, "reason": str(exc)}
+
+
+@app.get("/api/screenshot")
+def screenshot() -> StreamingResponse:
+    """Stream a fresh screenshot of the visible NosTale window, read-only."""
+    if _runtime_adapter is None:
+        return StreamingResponse(BytesIO(b""), media_type="image/png", status_code=503)
+    from app.client.windows_perception import WindowsNosTalePerception
+    frame = WindowsNosTalePerception(_runtime_adapter).capture()
+    return StreamingResponse(BytesIO(frame.png), media_type="image/png", headers={"Cache-Control": "no-store"})
 
 
 @app.get("/api/fonti")
