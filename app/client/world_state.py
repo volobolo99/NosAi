@@ -1,11 +1,12 @@
 """Normalized, observation-only world state for the NosTale runtime."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any
 
 from .nostale_windows import ClientState
 from .windows_hud import HudObservation
+from .multi_entity import MultiEntityObservation
 
 
 @dataclass(frozen=True)
@@ -13,6 +14,7 @@ class VisualWorldState:
     client: dict[str, Any]
     hud: HudObservation | None
     entities: tuple[dict[str, Any], ...] = ()
+    perception: dict[str, Any] | None = None
     source: str = "windows_visual_perception"
     observation_only: bool = True
 
@@ -28,10 +30,29 @@ class VisualWorldState:
                 "observation_only": self.hud.observation_only,
             },
             "entities": list(self.entities),
+            "perception": self.perception,
             "source": self.source,
             "observation_only": self.observation_only,
         }
 
 
-def from_client_state(state: ClientState, hud: HudObservation | None = None) -> VisualWorldState:
-    return VisualWorldState(client=dict(state.payload), hud=hud)
+def from_client_state(
+    state: ClientState,
+    hud: HudObservation | None = None,
+    perception: MultiEntityObservation | None = None,
+) -> VisualWorldState:
+    entities: tuple[dict[str, Any], ...] = ()
+    perception_dict = None
+    if perception is not None:
+        perception_dict = perception.to_dict()
+        entities = tuple(
+            item
+            for kind in ("player", "npc", "mob")
+            for item in perception_dict[kind]
+        )
+    return VisualWorldState(
+        client=dict(state.payload),
+        hud=hud,
+        entities=entities,
+        perception=perception_dict,
+    )
