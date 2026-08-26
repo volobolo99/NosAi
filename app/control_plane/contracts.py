@@ -8,12 +8,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from enum import StrEnum
+from enum import Enum
 from typing import Any, Mapping, Protocol, Sequence
 from uuid import UUID, uuid4
 
 
-class RunState(StrEnum):
+class RunState(str, Enum):
     QUEUED = "QUEUED"
     CONTEXT_READY = "CONTEXT_READY"
     PLANNED = "PLANNED"
