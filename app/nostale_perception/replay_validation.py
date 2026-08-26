@@ -28,7 +28,8 @@ class ReplayValidationResult:
 def validate_replay(observations: list[NetworkObservation], registry: DecoderRegistry) -> tuple[ReplayValidationResult, WorldModel]:
     model = WorldModel()
     decoded = applied = unknown = failures = 0
-    for observation in sorted(observations, key=lambda item: (item.sequence, item.observation_id)):
+    ordered = sorted(observations, key=lambda item: (item.timestamp_ms, item.observation_id))
+    for observation in ordered:
         semantic = registry.decode(observation)
         if semantic is None:
             unknown += 1
