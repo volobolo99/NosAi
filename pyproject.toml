@@ -18,6 +18,9 @@ vision = [
   "mss>=10,<11",
   "opencv-python>=4.10,<5",
 ]
+ocr = [
+  "pytesseract>=0.3.13,<1",
+]
 test = [
   "pytest>=9.0.3,<10",
   "pytest-cov>=6,<7",
