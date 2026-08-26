@@ -20,6 +20,7 @@ def test_full_cycle_executes_only_in_simulation() -> None:
     result = cycle.run(_state(), Goal.OBSERVE_AREA)
     assert result.outcome == "success"
     assert result.execution.executed is True
+    assert result.evidence.evaluation.success is True
     assert executor.executions == ["observe_area"]
 
 
@@ -29,6 +30,7 @@ def test_gateway_blocks_at_observe_level() -> None:
     result = cycle.run(_state(), Goal.OBSERVE_AREA)
     assert result.blocked is True
     assert result.execution.executed is False
+    assert result.evidence.outcome == "blocked"
     assert executor.executions == []
 
 
@@ -39,4 +41,5 @@ def test_invalid_state_never_reaches_executor() -> None:
     cycle = DeterministicDecisionCycle(executor, AutonomyLevel.ASSISTED)
     result = cycle.run(state, Goal.OBSERVE_AREA)
     assert result.blocked is True
+    assert result.evidence.outcome == "blocked"
     assert executor.executions == []
