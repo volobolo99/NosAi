@@ -9,6 +9,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 EXCLUDED = {".git", ".venv", "venv", "__pycache__", ".pytest_cache", ".mypy_cache"}
 SOURCE_ROOTS = ("app", "tests")
+FORBIDDEN_AI_CALLS = {"execute_action", "send_input", "press_key", "click"}
 
 
 def _files() -> list[Path]:
@@ -35,13 +36,12 @@ def scan_repository() -> dict[str, Any]:
     records: list[dict[str, Any]] = []
     edges: list[dict[str, str]] = []
     errors: list[dict[str, str]] = []
-    test_files = {p for p in files if p.parts and "tests" in p.parts}
+    test_files = {p for p in files if "tests" in p.parts}
 
     for path in files:
         text = path.read_text(encoding="utf-8", errors="replace")
         tree, error = _parse(path)
         rel = path.relative_to(ROOT).as_posix()
-        digest = hashlib.sha256(text.encode("utf-8")).hexdigest()[:16]
         lines = text.splitlines()
         record = {
             "path": rel,
@@ -50,7 +50,7 @@ def scan_repository() -> dict[str, Any]:
             "lines": len(lines),
             "nonblank_lines": sum(bool(x.strip()) for x in lines),
             "comment_lines": sum(x.lstrip().startswith("#") for x in lines),
-            "sha256_16": digest,
+            "sha256_16": hashlib.sha256(text.encode("utf-8")).hexdigest()[:16],
             "parse": "PASS" if tree is not None else "FAIL",
             "symbols": [],
             "imports": [],
@@ -77,23 +77,36 @@ def scan_repository() -> dict[str, Any]:
                 if name:
                     record["calls"].append(name)
         if "tests" in path.parts:
-            record["test_count"] = sum(1 for n in ast.walk(tree) if isinstance(n, ast.FunctionDef) and n.name.startswith("test_"))
+            record["test_count"] = sum(
+                1 for n in ast.walk(tree) if isinstance(n, (ast.FunctionDef, ast.AsyncFunctionDef)) and n.name.startswith("test_")
+            )
         records.append(record)
 
     source_files = [r for r in records if r["path"].startswith("app/")]
     for record in source_files:
         stem = Path(record["path"]).stem
-        related = [p.relative_to(ROOT).as_posix() for p in test_files if stem in p.stem or Path(record["path"]).parent.name in p.parts]
-        record["tests"] = sorted(set(related))
+        parent = Path(record["path"]).parent.name
+        record["tests"] = sorted(
+            {
+                p.relative_to(ROOT).as_posix()
+                for p in test_files
+                if stem in p.stem or parent in p.parts
+            }
+        )
 
     parsed = sum(r["parse"] == "PASS" for r in records)
+    unsafe = [
+        r["path"]
+        for r in records
+        if r["path"].startswith("app/ai/") and FORBIDDEN_AI_CALLS.intersection(r["calls"])
+    ]
     gates = {
         "G0": "PASS" if records else "FAIL",
         "G1": "PASS" if records and parsed == len(records) else "FAIL",
         "G2": "NOT_RUN",
         "G3": "PASS" if test_files else "FAIL",
         "G4": "NOT_RUN",
-        "G5": "PASS" if not any(x in " ".join(r.get("calls", [])) for r in records if r["path"].startswith("app/ai/")) else "WARN",
+        "G5": "FAIL" if unsafe else "PASS",
         "G6": "WARN" if not (ROOT / "coverage.xml").exists() else "PASS",
     }
     return {
@@ -101,6 +114,7 @@ def scan_repository() -> dict[str, Any]:
         "files": records,
         "communications": edges,
         "errors": errors,
+        "safety_violations": unsafe,
         "gates": gates,
         "summary": {
             "files": len(records),
