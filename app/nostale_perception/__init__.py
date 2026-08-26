@@ -7,14 +7,17 @@ are intentionally injected behind small interfaces.
 
 from .gamestate import GameState, GameStateBuilder, PlayerState, WorldEntity
 from .perception import Frame, FrameSource, ObservationPipeline, PerceptionResult
+from .windows_capture import WindowsFrameSource, WindowsWindowTarget
 
 __all__ = [
     "Frame",
     "FrameSource",
     "GameState",
     "GameStateBuilder",
-    "ObservationPipeline",
-    "PerceptionResult",
     "PlayerState",
     "WorldEntity",
+    "ObservationPipeline",
+    "PerceptionResult",
+    "WindowsFrameSource",
+    "WindowsWindowTarget",
 ]
