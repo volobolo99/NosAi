@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "purpose": "Machine-readable provenance registry for NosAi knowledge ingestion.",
+  "sources": [
+    {
+      "id": "noscore_packets",
+      "name": "NosCore.Packets",
+      "url": "https://github.com/NosCoreIO/NosCore.Packets",
+      "kind": "packet_schema",
+      "license": "MIT",
+      "trust": "primary_reference",
+      "notes": "Packet definitions and serialization/deserialization. Pin imported schemas to a commit or release before promotion."
+    },
+    {
+      "id": "noscore",
+      "name": "NosCore",
+      "url": "https://github.com/NosCoreIO/NosCore",
+      "kind": "server_reference",
+      "license": "MIT",
+      "trust": "reference",
+      "notes": "Useful for high-level game concepts and server-side semantics; never treat emulator behavior as proof of official-client behavior."
+    },
+    {
+      "id": "nossmooth",
+      "name": "NosSmooth",
+      "url": "https://github.com/Rutherther/NosSmooth",
+      "kind": "game_state_and_packets",
+      "license": "MIT",
+      "trust": "reference",
+      "notes": "Documents packet abstractions, game-state construction, data migration, combat and A* pathfinding."
+    },
+    {
+      "id": "nostale_packet_logger",
+      "name": "NosTale-PacketLogger",
+      "url": "https://github.com/Rutherther/NosTale-PacketLogger",
+      "kind": "capture_tool_reference",
+      "license": "MIT",
+      "trust": "capture_reference",
+      "notes": "Reference for replay/capture formats and packet observation workflows."
+    },
+    {
+      "id": "nostale_anonymizer",
+      "name": "NosTale-Anonymizer",
+      "url": "https://github.com/Rutherther/NosTale-Anonymizer",
+      "kind": "packet_catalog_reference",
+      "license": "MIT",
+      "trust": "reference",
+      "notes": "Useful catalog of packet headers and anonymization boundaries."
+    }
+  ],
+  "ingestion_policy": {
+    "prefer_primary": true,
+    "require_provenance": true,
+    "preserve_raw_fields": true,
+    "do_not_guess_packet_semantics": true,
+    "official_client_capture_required_for_live_promotion": true,
+    "do_not_copy_third_party_credentials_or_personal_data": true
+  }
+}
