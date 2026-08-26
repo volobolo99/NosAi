@@ -1,0 +1,9 @@
+{
+  "schema_version": 1,
+  "events": {
+    "in": {"effect": "create_or_update_entity", "verified": false},
+    "mv": {"effect": "update_entity", "verified": false},
+    "out": {"effect": "remove_entity", "verified": false}
+  },
+  "policy": "Event semantics must be promoted only after packet schema and live-client evidence agree."
+}
