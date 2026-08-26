@@ -1,8 +1,10 @@
-
-import sqlite3, json
-from datetime import datetime, timezone
+import sqlite3
+import json
+from datetime import datetime
 from pathlib import Path
+
 from app.memory_v2.models import Observation, MemoryFact, Inference, StrategyExperience
+
 
 class SQLiteMemoryStore:
     """Persistent implementation compatible with the AI Memory v2 concepts."""
@@ -63,7 +65,6 @@ class SQLiteMemoryStore:
         """)
         self.db.commit()
 
-    # MemoryStore-compatible API used by AIMemoryV2.
     def add_observation(self, x):
         self.save_observation(x)
 
@@ -113,9 +114,16 @@ class SQLiteMemoryStore:
         self.db.commit()
 
     def count(self, table):
-        allowed={"observations","facts","inferences","strategy_experiences"}
-        if table not in allowed: raise ValueError("invalid table")
-        return self.db.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        queries = {
+            "observations": "SELECT COUNT(*) FROM observations",
+            "facts": "SELECT COUNT(*) FROM facts",
+            "inferences": "SELECT COUNT(*) FROM inferences",
+            "strategy_experiences": "SELECT COUNT(*) FROM strategy_experiences",
+        }
+        query = queries.get(table)
+        if query is None:
+            raise ValueError("invalid table")
+        return self.db.execute(query).fetchone()[0]
 
     def close(self):
         self.db.close()

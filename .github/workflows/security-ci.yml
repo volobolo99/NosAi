@@ -35,7 +35,7 @@ jobs:
         run: python -m venv .venv
       - name: Install project and security tooling
         run: |
-          .venv/bin/python -m pip install --upgrade pip
+          .venv/bin/python -m pip install --upgrade pip 'setuptools>=83,<84' wheel
           .venv/bin/python -m pip install '.[test]'
           .venv/bin/python -m pip install 'pip-audit>=2,<3' 'bandit>=1.7,<2' 'PyYAML>=6,<7'
       - name: Audit installed project dependency closure
