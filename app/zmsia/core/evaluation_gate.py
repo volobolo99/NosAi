@@ -17,14 +17,15 @@ class Evaluator(Protocol):
 
 
 class DeterministicEvaluationGate:
-    """Minimal pre-execution gate: only validated noop actions are accepted."""
+    """Minimal pre-execution gate: only the explicit ``noop`` action is accepted."""
 
     def evaluate(self, state: State, decision: Decision, action: Action) -> EvaluationGateResult:
+        del state
         if not decision.decision_id:
             return EvaluationGateResult(False, ("missing_decision_id",))
         if not action.action_id:
             return EvaluationGateResult(False, ("missing_action_id",))
-        if action.action_type != "noop":
+        if action.action_id != "noop":
             return EvaluationGateResult(False, ("action_not_allowed_in_dry_run",))
         if not 0.0 <= decision.confidence <= 1.0:
             return EvaluationGateResult(False, ("invalid_decision_confidence",))
