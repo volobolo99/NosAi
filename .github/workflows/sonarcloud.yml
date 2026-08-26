@@ -11,6 +11,9 @@ permissions:
   contents: read
   pull-requests: read
 
+env:
+  SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
 jobs:
   sonarcloud:
     name: SonarCloud analysis
@@ -39,12 +42,10 @@ jobs:
 
       - name: SonarCloud scan (configured)
         if: ${{ env.SONAR_TOKEN != '' }}
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         uses: SonarSource/sonarqube-scan-action@v6
 
       - name: SonarCloud health check (not configured)
-        if: ${{ secrets.SONAR_TOKEN == '' }}
+        if: ${{ env.SONAR_TOKEN == '' }}
         run: |
           echo "SONAR_TOKEN is not configured; external SonarCloud analysis is skipped."
           echo "SonarCloud workflow health: OK"
