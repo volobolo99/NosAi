@@ -26,7 +26,12 @@ def main() -> int:
         horizon=args.horizon,
     )
     profile, report = profile_benchmark(config=config)
-    payload = {"profile": profile.to_dict(), "benchmark": report.to_dict()}
+    payload = {
+        "schema": 1,
+        "profile": profile.to_dict(),
+        "benchmark": report.to_dict(),
+    }
+    args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(payload, indent=2, sort_keys=True), encoding="utf-8")
     print(f"runtime profile written to {args.output}")
     print(f"wall_time_s={profile.wall_time_s:.6f}")
