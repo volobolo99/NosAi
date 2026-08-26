@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 import hashlib
+import http.client
 import json
 import tempfile
 import urllib.parse
-import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -22,17 +22,34 @@ class ImportedSnapshot:
 
 
 def fetch_json(url: str, *, timeout: float = 20.0) -> Any:
-    """Fetch JSON only over explicitly permitted HTTP(S) schemes."""
+    """Fetch JSON over an explicitly permitted HTTP(S) URL without redirects."""
     parsed = urllib.parse.urlparse(url)
-    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
         raise ValueError("static data source must use an absolute http(s) URL")
-    request = urllib.request.Request(
-        url,
-        headers={"Accept": "application/json", "User-Agent": "NosAi-static-importer/1"},
-    )
-    # B310 is intentionally suppressed here because the URL scheme is validated immediately above.
-    with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310
-        return json.load(response)
+    if parsed.username or parsed.password:
+        raise ValueError("static data source must not contain URL credentials")
+    if parsed.fragment:
+        raise ValueError("static data source must not contain a URL fragment")
+
+    host = parsed.hostname
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    connection_cls = http.client.HTTPSConnection if parsed.scheme == "https" else http.client.HTTPConnection
+    connection = connection_cls(host, port=port, timeout=timeout)
+    try:
+        path = parsed.path or "/"
+        if parsed.query:
+            path += f"?{parsed.query}"
+        connection.request(
+            "GET",
+            path,
+            headers={"Accept": "application/json", "User-Agent": "NosAi-static-importer/1"},
+        )
+        response = connection.getresponse()
+        if response.status < 200 or response.status >= 300:
+            raise ValueError(f"static data source returned HTTP {response.status}")
+        return json.loads(response.read().decode("utf-8"))
+    finally:
+        connection.close()
 
 
 def canonical_json(payload: Any) -> bytes:
