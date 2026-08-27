@@ -2,16 +2,17 @@
 
 > **Status:** canonical planning document  
 > **Date:** 2026-08-27  
-> **Scope:** complete NosAi architecture, including the permanent `PlayAi` + `GuardAi` cognitive model.
+> **Scope:** complete NosAi architecture, including the permanent `PlayAi` + `GuardAi` cognitive model and the Decision Fabric control plane.
 
 ## 1. Mission
 
-NosAi is an AI system for playing NosTale through a controlled perception → reasoning → decision → action loop. The target architecture separates the operational agent from an independent supervisory intelligence.
+NosAi is an AI system for playing NosTale through a controlled perception → reasoning → decision → action loop. The target architecture separates the operational agent from an independent supervisory intelligence and places both behind a governed decision/control layer.
 
 - **PlayAi** — permanent identity of the primary AI. It is the operational pilot: understands the game state, plans, decides and executes actions in pursuit of goals.
 - **GuardAi** — permanent identity of the secondary AI. It is the cognitive guardian: critiques PlayAi, predicts outcomes, estimates probabilities, runs simulations, searches alternative strategies and recommends improvements.
+- **Decision Fabric** — the governed coordination/control plane between proposal, review, memory/knowledge access, arbitration, safety and execution.
 
-The names are architectural identities and must remain stable. Technical terms such as `primary` and `secondary` may be used only as implementation metadata, not as replacement identities.
+The names `PlayAi` and `GuardAi` are architectural identities and must remain stable. Technical terms such as `primary` and `secondary` may be used only as implementation metadata, not as replacement identities.
 
 ## 2. Target architecture
 
@@ -32,9 +33,18 @@ World Model + Shared Context
       │                              │
       └──────────────┬───────────────┘
                      ↓
-             Arbitration / Review
+               Decision Fabric
+       ┌─────────────┼──────────────┐
+       ↓             ↓              ↓
+    Knowledge       Memory       Arbitration
+       │             │              │
+       └─────────────┼──────────────┘
                      ↓
-                 Safety Gate
+                Safety Gate
+                     ↓
+               Hard Deadline
+                     ↓
+              Human Override
                      ↓
                   Executor
                      ↓
@@ -64,17 +74,65 @@ The repository baseline already contains or documents the following foundations 
 8. Controlled shared memory with source, confidence and versioning.
 9. Benchmark/AutoSet direction for adapting local inference to the host computer.
 10. Dashboard/control-center direction, including automatic configuration.
+11. AI-lab/evaluation foundations for scenario testing and evidence.
 
 These are foundations, not permission to bypass the gates below.
 
-## 4. Roadmap status model
+## 4. Consolidation decisions added after architecture audit
+
+### 4.1 Decision Fabric
+
+Introduce a dedicated control plane that separates:
+
+`proposal → review → arbitration → authorization → execution`.
+
+PlayAi and GuardAi must not directly bypass this layer to reach the real executor.
+
+### 4.2 Memory architecture
+
+Use technology-neutral interfaces first. The implementation may use an in-memory store for hot/realtime state and a persistent/vector-capable store for semantic/strategic retrieval after benchmark validation. Do not hard-code Redis or a specific vector database before measuring the actual workload.
+
+Required logical stores:
+- hot world state;
+- episodic memory;
+- semantic knowledge;
+- strategic memory;
+- prediction memory;
+- failure memory.
+
+### 4.3 Hard deadlines
+
+GuardAi review must have an explicit deadline. A timeout must produce a deterministic, state-aware fallback rather than blocking PlayAi indefinitely. The fallback policy must be configurable and testable; examples include safe retreat, defensive action or resource preservation depending on state.
+
+### 4.4 Hardware capability profile
+
+AutoSet must classify measured hardware capability instead of relying on one universal VRAM threshold. Profiles should control model choice, concurrency, simulation budget and graceful degradation. On insufficient resources GuardAi may degrade or be disabled, while PlayAi falls back to validated deterministic/heuristic behavior.
+
+### 4.5 Human Override / Kill Switch
+
+The dashboard must provide an immediate operator override that:
+- stops new real actions;
+- pauses agent loops safely;
+- preserves authoritative state;
+- leaves background processes recoverable;
+- allows controlled resume.
+
+### 4.6 Knowledge / RAG
+
+Create a Knowledge Base abstraction and retrieval layer for stable game knowledge and approved external/documentary sources. Retrieved knowledge must retain provenance and confidence and must not silently overwrite observed world state. RAG is a context provider, not an authority that can bypass Safety Gate.
+
+### 4.7 Anti-cheat / compliance boundary
+
+Do not add mechanisms whose purpose is to evade anti-cheat detection. Keep client integration, action transport, safety and operator override explicit and auditable. Validate compatibility and allowed usage separately from the AI reasoning layer.
+
+## 5. Roadmap status model
 
 - **DONE:** foundation exists and is accepted as baseline.
 - **INTEGRATE:** foundation exists but must be connected to the new PlayAi/GuardAi architecture.
 - **TODO:** implementation required.
 - **GATE:** validation required before promotion.
 
-## 5. Master phases
+## 6. Master phases
 
 ### Phase 0 — Governance & baseline — DONE
 - Maintain stable `main` and controlled development flow.
@@ -149,6 +207,7 @@ Required metadata:
 
 ### Phase 6 — Shared Context & Memory — INTEGRATE
 Split memory into:
+- hot world state;
 - episodic memory;
 - semantic knowledge;
 - strategic memory;
@@ -156,6 +215,8 @@ Split memory into:
 - failure memory.
 
 Add provenance, confidence, versioning, conflict resolution, TTL/decay where appropriate, snapshots and rollback.
+
+Use technology-neutral repository interfaces. Select concrete in-memory/vector/persistent backends only after workload and hardware benchmarks.
 
 **Rule:** agents propose memory changes; an authorization gate commits authoritative knowledge.
 
@@ -238,6 +299,7 @@ Never allow unvalidated automatic code mutation in the production runtime.
 - Support READY/BUSY/DEGRADED/UNAVAILABLE states.
 - Keep core interfaces vendor/model agnostic.
 - Define resource budgets and fallback behavior.
+- Enforce GuardAi hard deadlines.
 
 **Exit:** local inference participates in the same governed orchestration path.
 
@@ -255,7 +317,8 @@ AutoSet must derive:
 - context/batch limits;
 - simulation budget;
 - concurrency;
-- degradation policy.
+- degradation policy;
+- GuardAi deadline/budget.
 
 Dashboard must expose automatic configuration and benchmark results.
 
@@ -267,20 +330,32 @@ Dashboard must expose automatic configuration and benchmark results.
 - Preserve preflight.
 - Require valid/consistent world state before any real action.
 - Progress from observation/dry-run toward controlled execution only after all gates pass.
+- Keep compliance/anti-cheat concerns outside the reasoning engine and do not implement detection-evasion behavior.
 
 **Exit:** live action is impossible when state validation fails.
 
-### Phase 15 — Dashboard / Control Center — TODO
-Views:
+### Phase 15 — Decision Fabric, Dashboard & Control Center — TODO
+Decision Fabric must expose:
+- proposal state;
+- review state;
+- arbitration;
+- authorization;
+- deadline/timeout;
+- fallback;
+- execution result;
+- audit trail.
+
+Dashboard views:
 - PlayAi status/goal/decision/confidence;
 - GuardAi risk/prediction/simulation/alternatives;
 - cooperation timeline;
 - disagreements and consensus;
 - benchmark/AutoSet;
 - memory/replay;
-- dry-run/read-only/live separation.
+- dry-run/read-only/live separation;
+- **Human Override / Kill Switch**.
 
-**Exit:** an operator can understand why a decision happened without inspecting source code.
+**Exit:** an operator can understand why a decision happened without inspecting source code and can immediately pause real actions.
 
 ### Phase 16 — Test Center + CI — TODO/GATE
 Add:
@@ -291,6 +366,8 @@ Add:
 - prediction calibration tests;
 - conflict/fallback/timeout tests;
 - memory integrity tests;
+- Decision Fabric authorization tests;
+- Human Override tests;
 - performance budgets;
 - benchmark regressions;
 - integration tests for PlayAi + GuardAi.
@@ -307,7 +384,9 @@ Metrics:
 - prediction error;
 - reward;
 - survival/failure rate;
-- resource usage.
+- resource usage;
+- timeout/fallback rate;
+- human override events.
 
 All traces should correlate via `decision_id`, `correlation_id` and `context_id`.
 
@@ -317,6 +396,7 @@ All traces should correlate via `decision_id`, `correlation_id` and `context_id`
 Enforce:
 - proposal ≠ authorization ≠ execution;
 - GuardAi cannot bypass Safety Gate;
+- Decision Fabric cannot bypass Human Override;
 - no uncontrolled runtime/code self-modification;
 - secret isolation;
 - least privilege for tools/adapters;
@@ -329,6 +409,7 @@ Enforce:
 - cache repeated simulations;
 - batch where beneficial;
 - adaptive simulation budgets;
+- hard deadlines;
 - controlled degradation;
 - timeout/recovery;
 - authoritative-state persistence.
@@ -343,7 +424,8 @@ Required comparisons:
 - strategy A vs B;
 - predictor calibration;
 - resource cost vs decision quality;
-- difficult vs ordinary scenarios.
+- difficult vs ordinary scenarios;
+- full GuardAi vs degraded GuardAi vs GuardAi-disabled fallback.
 
 **Exit:** measurable evidence that GuardAi improves decisions rather than merely adding latency.
 
@@ -370,7 +452,7 @@ Sequence:
 - Prediction calibration improves over time.
 - Regressions trigger rollback.
 
-## 6. External technical inspiration
+## 7. External technical inspiration
 
 Use external projects as patterns/components to evaluate, not as blind dependencies:
 
@@ -380,12 +462,14 @@ Use external projects as patterns/components to evaluate, not as blind dependenc
 - **Microsoft Agent Framework:** modern orchestration/workflow ideas; evaluate selectively.
 - **AutoGen:** useful historical reference for multi-agent messaging, but do not make it a foundational dependency without a current technical justification.
 
-## 7. Dependency order
+## 8. Dependency order
 
-The critical dependency chain is:
+The consolidated dependency chain is:
 
 ```text
 Identity/contracts
+      ↓
+Decision Fabric contracts
       ↓
 PlayAi + GuardAi core
       ↓
@@ -393,11 +477,13 @@ Protocol + Shared Context
       ↓
 World Model
       ↓
+Memory/Knowledge interfaces
+      ↓
 Simulator
       ↓
 Predictor / Risk / Strategy Search
       ↓
-Arbitration + Safety Gate
+Arbitration + Safety + Hard Deadline + Human Override
       ↓
 Local Runtime + AutoSet
       ↓
@@ -410,7 +496,7 @@ Live Pilot
 
 Do not reverse this order by adding advanced RL before the simulator and evaluation system are trustworthy.
 
-## 8. Definition of Done for the whole project
+## 9. Definition of Done for the whole project
 
 NosAi is considered mature when:
 
@@ -419,15 +505,18 @@ NosAi is considered mature when:
 3. GuardAi can simulate meaningful alternatives before high-impact decisions.
 4. Predictions are calibrated against real outcomes.
 5. Shared memory is versioned, attributable and controlled.
-6. Every important decision is traceable and replayable.
-7. Safety Gate separates reasoning from real execution.
-8. Local inference is automatically tuned to the host machine.
-9. Dashboard exposes the complete cognitive loop.
-10. CI/Test Center/benchmark/security gates protect releases.
-11. Learning improves validated strategies without uncontrolled runtime mutation.
-12. The system degrades safely when models, resources or observations are unavailable.
+6. Semantic/strategic knowledge is retrievable with provenance.
+7. Every important decision is traceable and replayable.
+8. Decision Fabric separates reasoning from authorization and execution.
+9. Safety Gate and Human Override can stop real actions safely.
+10. GuardAi has hard deadlines and deterministic fallbacks.
+11. Local inference is automatically tuned to the host machine.
+12. Dashboard exposes the complete cognitive loop.
+13. CI/Test Center/benchmark/security gates protect releases.
+14. Learning improves validated strategies without uncontrolled runtime mutation.
+15. The system degrades safely when models, resources or observations are unavailable.
 
-## 9. AI implementation contract
+## 10. AI implementation contract
 
 An AI implementing this roadmap must:
 
@@ -440,4 +529,6 @@ An AI implementing this roadmap must:
 - validate changes with CI/Test Center where available;
 - prefer deterministic, observable components for safety-critical decisions;
 - keep PlayAi and GuardAi responsibilities explicit;
+- treat Decision Fabric as the authorization/control boundary;
+- keep human override available before real execution;
 - treat this document as the master plan and update phase status after each validated gate.
