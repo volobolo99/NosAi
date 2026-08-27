@@ -52,6 +52,7 @@ def evaluate_decision(
 def validate_scenario(scenario: Mapping[str, Any]) -> tuple[str, ...]:
     required = {"scenario_id", "world_state", "available_actions", "constraints", "source", "schema_version"}
     missing = sorted(required.difference(scenario))
-    if not isinstance(scenario.get("available_actions", []), list):
+    available_actions = scenario.get("available_actions")
+    if not isinstance(available_actions, list):
         missing.append("available_actions:list")
     return tuple(missing)
