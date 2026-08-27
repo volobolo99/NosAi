@@ -1,4 +1,4 @@
-# NosAi — Master Roadmap V3
+# NosAi — Master Roadmap V4
 
 Date: 2026-08-27
 Branch: `develop/nosai-next`
@@ -8,7 +8,7 @@ Stable branch: `main`
 
 NosAi is **offline-first and continually improving**. The gameplay core must remain usable without Internet. Online services feed an isolated Evolution Lab that researches, proposes and evaluates improvements. No Internet result or simulation result directly changes production.
 
-`experience -> observation -> research -> candidate -> sandbox -> replay -> regression -> anti-forgetting -> staging -> real Windows -> real NosTale -> explicit confirmation -> consolidation`
+`experience -> observation -> research -> candidate -> immutable payload -> Windows Sandbox -> replay -> regression -> anti-forgetting -> evidence -> staging -> real Windows -> real NosTale -> explicit confirmation -> consolidation`
 
 ## P0 — Evolution safety and evidence
 
@@ -23,16 +23,18 @@ NosAi is **offline-first and continually improving**. The gameplay core must rem
 | Patch evaluation gate | implemented | 70% |
 | Sandbox request safety validation | hardened contract | 70% |
 | Windows Sandbox CLI backend | implemented, host validation pending | 40% |
-| Immutable runtime payload integrity verifier | implemented, payload packaging pending | 35% |
+| Immutable runtime payload integrity verifier | implemented | 45% |
+| Deterministic runtime manifest builder | implemented | 45% |
 | Deterministic protected replay executor | implemented | 60% |
 | Candidate regression suite | implemented | 55% |
 | Integrated sandbox -> replay -> regression pipeline | implemented, host validation pending | 50% |
+| Windows evidence schema/collector | implemented, real-host validation pending | 45% |
 | Windows Sandbox CI gate | configured, self-hosted runner required | 35% |
 | Prepared immutable Windows runtime payload | pending | 10% |
-| Real Windows evidence collector | pending | 25% |
+| Real Windows evidence collector validation | pending | 25% |
 | Real NosTale evidence collector | pending | 15% |
 
-The percentages are engineering maturity estimates, not test-pass claims. The OS-level sandbox and integrated validation pipeline remain below production readiness until they are exercised on an actual supported Windows host with a prepared immutable runtime payload.
+Percentages are engineering maturity estimates, not test-pass claims. OS-level execution remains below production readiness until exercised on an actual supported Windows host with a prepared immutable payload. Evidence marked REAL must come from the real host; CI/SIMULATED results never get relabeled as REAL.
 
 ## P1 — Offline intelligence
 
