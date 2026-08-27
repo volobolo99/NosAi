@@ -80,3 +80,40 @@ jobs:
 
       - name: Run AI evaluation gate
         run: python -m pytest -q tests/unit/test_ai_evaluation.py
+
+  openai-smoke:
+    name: OpenAI credential + Responses API smoke (simulation only)
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      NOSAI_OPENAI_MODEL: gpt-5.2
+      NOSAI_SIMULATION_ONLY: '1'
+      NOSAI_LIVE_ACTIONS: '0'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+
+      - name: Install OpenAI smoke-test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install 'pytest>=8,<9' 'openai>=1,<2'
+
+      - name: Verify secret is present without exposing it
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "${OPENAI_API_KEY:-}" || { echo 'OPENAI_API_KEY GitHub Secret is missing'; exit 1; }
+          echo 'OPENAI_API_KEY is configured.'
+
+      - name: Run real OpenAI API smoke test
+        run: python -m pytest -q tests/integration/test_openai_smoke.py
