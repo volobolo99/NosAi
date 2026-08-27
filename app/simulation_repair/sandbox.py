@@ -6,7 +6,7 @@ injected by the runtime and must explicitly report its isolation boundary.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Protocol
 
 
 @dataclass(slots=True)
@@ -47,6 +47,18 @@ class NoOpSandbox:
         )
 
 
+def _unsafe_path(path: str) -> bool:
+    normalized = path.replace("\\", "/")
+    parts = normalized.split("/")
+    return (
+        not normalized
+        or normalized.startswith("/")
+        or normalized.startswith("~")
+        or len(normalized) >= 2 and normalized[1] == ":"
+        or ".." in parts
+    )
+
+
 def validate_request(request: SandboxRequest) -> list[str]:
     errors: list[str] = []
     if request.timeout_seconds <= 0 or request.timeout_seconds > 900:
@@ -55,7 +67,9 @@ def validate_request(request: SandboxRequest) -> list[str]:
         errors.append("candidate_id is required")
     if request.network:
         errors.append("network access must remain disabled for the core sandbox")
+    if not request.command:
+        errors.append("command is required for an executable sandbox request")
     for path in request.files:
-        if path.startswith("/") or ".." in path.split("/"):
+        if _unsafe_path(path):
             errors.append(f"unsafe sandbox path: {path}")
     return errors
