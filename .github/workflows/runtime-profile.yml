@@ -3,12 +3,13 @@ name: Runtime profile
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, develop/nosai-next]
     paths:
       - 'app/**'
       - 'tools/**'
       - '.github/workflows/runtime-profile.yml'
   pull_request:
+    branches: [main]
     paths:
       - 'app/**'
       - 'tools/**'
