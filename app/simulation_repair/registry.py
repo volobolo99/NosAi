@@ -40,7 +40,9 @@ class VersionRegistry:
         with self.path.open("r", encoding="utf-8") as handle:
             for line in handle:
                 if line.strip():
-                    entry = RegistryEntry(**json.loads(line))
+                    payload = json.loads(line)
+                    payload["provenance"] = tuple(payload.get("provenance", ()))
+                    entry = RegistryEntry(**payload)
                     if kind is None or entry.kind == kind:
                         result.append(entry)
         return result
