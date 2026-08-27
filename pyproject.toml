@@ -28,6 +28,7 @@ test = [
   "numpy>=1.26,<3",
   "fastapi>=0.115,<1",
   "httpx>=0.27,<1",
+  "opencv-python>=4.10,<5",
 ]
 dev = [
   "pytest>=9.0.3,<10",
