@@ -1,0 +1,53 @@
+name: Windows Sandbox Integration
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop/nosai-next]
+    paths:
+      - 'app/simulation_repair/**'
+      - 'tests/integration/test_windows_sandbox_runtime.py'
+      - '.github/workflows/windows-sandbox.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-sandbox-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    name: Real Windows Sandbox smoke
+    # Requires a project-controlled Windows runner with Windows Sandbox enabled.
+    # Do not move this to a generic hosted runner and assume nested virtualization.
+    runs-on: [self-hosted, windows, nosai-sandbox]
+    timeout-minutes: 20
+    env:
+      NOSAI_RUN_WINDOWS_SANDBOX: '1'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+
+      - name: Install test environment
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install 'pytest>=9,<10'
+          python -m pip install -e . --no-deps
+
+      - name: Verify Windows Sandbox CLI
+        shell: pwsh
+        run: |
+          $wsb = Get-Command wsb -ErrorAction SilentlyContinue
+          if (-not $wsb) { throw 'Windows Sandbox CLI (wsb) is required on this runner.' }
+          wsb list --raw
+
+      - name: Run real sandbox smoke test
+        shell: pwsh
+        run: python -m pytest -q tests/integration/test_windows_sandbox_runtime.py
