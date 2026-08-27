@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import Sequence
 
 from .candidate_generator import CandidateProposal, generate_candidates
 from .code_generation import CodeCandidate, CodeGenerationProvider, validate_candidate
@@ -19,29 +20,62 @@ class ResearchPipelineResult:
 
 
 class ResearchPipeline:
-    """Collect evidence and generate candidates without applying changes."""
+    """Collect evidence and generate candidates without applying changes.
 
-    def __init__(self, researcher: MultiSourceResearchProvider | None = None, code_generator: CodeGenerationProvider | None = None) -> None:
+    The pipeline is intentionally side-effect free with respect to the target
+    repository. Remote material is evidence only; candidate code must pass the
+    structural gate before it can be handed to an isolated sandbox.
+    """
+
+    def __init__(
+        self,
+        researcher: MultiSourceResearchProvider | None = None,
+        code_generator: CodeGenerationProvider | None = None,
+    ) -> None:
         self.researcher = researcher or MultiSourceResearchProvider()
         self.code_generator = code_generator
 
-    def run(self, error: ErrorEvent, *, max_sources: int = 16, max_proposals: int = 8) -> ResearchPipelineResult:
-        queries = build_research_queries(error.error_type, error.message, error.component)
-        hits = self.researcher.search(queries, total_limit=max_sources)
-        proposals = generate_candidates(error.error_type, error.message, hits, limit=max_proposals)
+    def run(
+        self,
+        error: ErrorEvent,
+        *,
+        max_sources: int = 16,
+        max_proposals: int = 8,
+    ) -> ResearchPipelineResult:
+        if max_sources < 1 or max_proposals < 1:
+            raise ValueError("max_sources and max_proposals must be positive")
+
+        queries = tuple(
+            build_research_queries(error.error_type, error.message, error.component)
+        )
+        hits = tuple(self.researcher.search(queries, total_limit=max_sources))
+        proposals = tuple(
+            generate_candidates(
+                error.error_type,
+                error.message,
+                hits,
+                limit=max_proposals,
+            )
+        )
+
         generated: list[CodeCandidate] = []
         rejected: list[tuple[str, tuple[str, ...]]] = []
         if self.code_generator is not None and proposals:
-            for candidate in self.code_generator.generate(error_type=error.error_type, message=error.message, proposals=proposals):
+            for candidate in self.code_generator.generate(
+                error_type=error.error_type,
+                message=error.message,
+                proposals=proposals,
+            ):
                 errors = tuple(validate_candidate(candidate))
                 if errors:
                     rejected.append((candidate.candidate_id, errors))
                 else:
                     generated.append(candidate)
+
         return ResearchPipelineResult(
-            queries=tuple(queries),
-            hits=tuple(hits),
-            proposals=tuple(proposals),
+            queries=queries,
+            hits=hits,
+            proposals=proposals,
             code_candidates=tuple(generated),
             rejected_code_candidates=tuple(rejected),
         )
