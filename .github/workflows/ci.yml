@@ -43,7 +43,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install 'pytest>=8,<9' 'ruff>=0.6,<1' 'fastapi>=0.115,<1' 'httpx>=0.27,<1' 'numpy>=1.26,<3'
+          python -m pip install 'pytest>=8,<9' 'ruff>=0.6,<1' 'fastapi>=0.115,<1' 'httpx>=0.27,<1' 'numpy>=1.26,<3' 'opencv-python>=4.10,<5'
           python -m pip install 'torch==2.8.0' --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -e . --no-deps
           python -m pip check
@@ -51,9 +51,11 @@ jobs:
       - name: Verify runtime dependencies
         run: |
           python - <<'PY'
+          import cv2
           import numpy
           import torch
           import torch.nn as nn
+          print(f"opencv={cv2.__version__}")
           print(f"numpy={numpy.__version__}")
           print(f"torch={torch.__version__}")
           assert nn.Module is not None
