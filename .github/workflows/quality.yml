@@ -32,7 +32,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install 'pytest>=9.0.3,<10' 'pytest-cov>=6,<7' 'ruff>=0.6,<1' 'fastapi>=0.115,<1' 'httpx>=0.27,<1' 'numpy>=1.26,<3'
+          python -m pip install 'pytest>=9.0.3,<10' 'pytest-cov>=6,<7' 'ruff>=0.6,<1' 'fastapi>=0.115,<1' 'httpx>=0.27,<1' 'numpy>=1.26,<3' 'opencv-python-headless>=4.10,<5'
           python -m pip install 'torch==2.9.1' --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -e . --no-deps
       - name: Dependency integrity
@@ -168,7 +168,7 @@ jobs:
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install 'pytest>=9.0.3,<10' 'fastapi>=0.115,<1' 'httpx>=0.27,<1' 'numpy>=1.26,<3'
+          python -m pip install 'pytest>=9.0.3,<10' 'fastapi>=0.115,<1' 'httpx>=0.27,<1' 'numpy>=1.26,<3' 'opencv-python-headless>=4.10,<5'
           python -m pip install 'torch==2.9.1' --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -e . --no-deps
       - name: Observation-only safety tests
