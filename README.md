@@ -62,7 +62,7 @@ NosAi is formally **offline-first and continually improving**. Online services f
 
 `real experience -> observation -> online research -> candidate -> sandbox -> replay -> regression -> anti-forgetting -> offline staging -> real Windows -> real NosTale -> explicit confirmation -> consolidation`
 
-The P0 block now contains the promotion/evidence contracts, protected replay execution, candidate regression evaluation and a real Windows Sandbox CLI backend. The OS-level backend deliberately fails closed until it is exercised on a supported Windows host with an immutable runtime payload.
+The P0 block now contains the promotion/evidence contracts, protected replay execution, candidate regression evaluation and an integrated `sandbox -> replay -> regression` pipeline. A real Windows Sandbox CLI backend is present and fails closed until exercised on a supported Windows host with an immutable runtime payload.
 
 See:
 
@@ -81,7 +81,8 @@ See:
 | Research -> candidate -> simulation | 70% |
 | Promotion/evolution governance | 70% |
 | Protected replay | 70% |
-| Candidate regression | 45% |
+| Candidate regression | 55% |
+| Integrated sandbox -> replay -> regression | 45% (host validation pending) |
 | Windows Sandbox backend | 35% (host validation pending) |
 | Offline-first AI core | 55% |
 | RL layer | 45% |
