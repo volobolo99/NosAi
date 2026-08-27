@@ -1,0 +1,44 @@
+name: Windows runtime observation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop/nosai-next]
+    paths:
+      - 'app/client/**'
+      - 'app/dashboard/**'
+      - '.github/workflows/runtime-windows-observation.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/client/**'
+      - 'app/dashboard/**'
+      - '.github/workflows/runtime-windows-observation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  windows-observation:
+    name: Windows adapter contract
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+
+      - name: Install package
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e . --no-deps
+
+      - name: Validate Windows observation adapter
+        shell: pwsh
+        run: |
+          python -c "import os; from app.client.nostale_windows import WindowsNosTaleAdapter; from app.client.adapter import validate_adapter; a=WindowsNosTaleAdapter(); validate_adapter(a); assert os.name == 'nt'; assert a.validate_action(None) is True; assert a.validate_action('attack') is False; print('windows adapter contract: valid; live client discovery intentionally not required in CI')"
