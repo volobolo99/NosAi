@@ -1,30 +1,24 @@
-"""Convert observation-only perception output into the canonical WorldState."""
+"""Convert observation-only perception output into canonical WorldState."""
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, Mapping
 
 from app.client.multi_entity import MultiEntityObservation
 
+from .entity_tracker import EntityTracker
+from .hud_state import HudStateExtractor, HudValue
 from .state import EntityState, WorldState
 
 
 class ObservationMapper:
-    """Fuse observation-only perception output into a WorldState snapshot.
+    """Fuse perception into WorldState while preserving confidence/provenance."""
 
-    The mapper never performs client I/O. It only translates detections into
-    structured state and preserves confidence/source metadata for Brain and
-    Memory consumers.
-    """
+    def __init__(self, tracker: EntityTracker | None = None, hud_extractor: HudStateExtractor | None = None) -> None:
+        self.tracker = tracker or EntityTracker()
+        self.hud_extractor = hud_extractor or HudStateExtractor()
 
-    def update(
-        self,
-        previous: WorldState | None,
-        observation: MultiEntityObservation,
-        *,
-        map_id: str | None = None,
-        tick: int | None = None,
-    ) -> WorldState:
+    def update(self, previous: WorldState | None, observation: MultiEntityObservation, *, map_id: str | None = None, tick: int | None = None, hud: Mapping[str, HudValue] | None = None) -> WorldState:
         state = (previous or WorldState()).copy()
         next_tick = state.tick + 1 if tick is None else tick
         if next_tick < state.tick:
@@ -36,31 +30,25 @@ class ObservationMapper:
         if map_id is not None:
             state.map_id = map_id
 
-        for detection in observation.all_entities:
-            entity_id = self._entity_id(detection)
-            state.entities[entity_id] = EntityState(
-                entity_id=entity_id,
-                entity_type=detection.kind,
-                attributes={
-                    "x": detection.x,
-                    "y": detection.y,
-                    "width": detection.width,
-                    "height": detection.height,
-                },
-                confidence=detection.confidence,
-                source=detection.source,
+        raw_entities = [
+            EntityState(
+                entity_id=self._entity_id(d),
+                entity_type=d.kind,
+                attributes={"x": d.x, "y": d.y, "width": d.width, "height": d.height},
+                confidence=d.confidence,
+                source=d.source,
                 last_seen_tick=state.tick,
             )
+            for d in observation.all_entities
+        ]
+        tracked = self.tracker.track(state, raw_entities)
+        state.entities = {entity.entity_id: entity for entity in tracked}
 
         if observation.player:
             player = max(observation.player, key=lambda d: d.confidence)
-            state.character.update(
-                {
-                    "screen_x": player.x,
-                    "screen_y": player.y,
-                    "vision_confidence": player.confidence,
-                }
-            )
+            state.character.update({"screen_x": player.x, "screen_y": player.y, "vision_confidence": player.confidence})
+        if hud:
+            state.character.update(self.hud_extractor.extract(hud))
         return state
 
     @staticmethod
