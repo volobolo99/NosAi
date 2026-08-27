@@ -68,7 +68,7 @@ jobs:
         run: python tools/build_test_center_evidence.py
       - name: Publish Test Center evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: nosai-test-center-${{ github.sha }}
           path: |
@@ -79,7 +79,7 @@ jobs:
           retention-days: 30
       - name: Publish regression test results
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: nosai-test-results-${{ github.sha }}
           path: test-results.xml
@@ -99,13 +99,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Download Test Center evidence
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: nosai-test-center-${{ github.sha }}
           path: .ci-test-center
           if-no-artifact-found: ignore
       - name: Download security evidence
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: nosai-security-evidence-${{ github.sha }}
           path: .ci-security
