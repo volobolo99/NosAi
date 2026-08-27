@@ -1,0 +1,36 @@
+name: Version consistency
+
+on:
+  push:
+    branches: [main, develop/nosai-next]
+  pull_request:
+    branches: [main, develop/nosai-next]
+
+jobs:
+  version-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check canonical version metadata
+        run: |
+          python - <<'PY'
+          import json
+          import re
+          from pathlib import Path
+
+          pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
+          match = re.search(r'^version\\s*=\\s*[\"\\\']([^\"\\\']+)[\"\\\']', pyproject, re.M)
+          if not match:
+              raise SystemExit("Unable to find project version in pyproject.toml")
+          canonical = match.group(1)
+
+          metadata = json.loads(Path("version.json").read_text(encoding="utf-8"))
+          if metadata.get("version") != canonical:
+              raise SystemExit(f"version.json={metadata.get('version')!r} != pyproject.toml={canonical!r}")
+
+          readme = Path("README.md").read_text(encoding="utf-8")
+          if f"version **{canonical}**" not in readme:
+              raise SystemExit(f"README.md does not declare canonical version {canonical}")
+
+          print(f"NosAi version metadata consistent: {canonical}")
+          PY
