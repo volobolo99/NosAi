@@ -18,17 +18,19 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.10")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.11")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 ASSET_ROOT = WEB_ROOT / "assets"
 _runtime_adapter: Any | None = None
+_previous_frame_png: bytes | None = None
 app.mount("/assets", StaticFiles(directory=ASSET_ROOT), name="dashboard-assets")
 
 
 def set_runtime_adapter(adapter: Any | None) -> None:
-    global _runtime_adapter
+    global _runtime_adapter, _previous_frame_png
     _runtime_adapter = adapter
+    _previous_frame_png = None
 
 
 def configure_nostale_observation() -> str:
@@ -159,7 +161,7 @@ def perception() -> dict[str, Any]:
     try:
         from app.client.windows_perception import WindowsNosTalePerception
         frame = WindowsNosTalePerception(_runtime_adapter).capture()
-        return {"available": True, "width": frame.width, "height": frame.height, "source": frame.source, "observation_only": frame.observation_only, "screenshot_url": "/api/screenshot"}
+        return {"available": True, "width": frame.width, "height": frame.height, "source": frame.source, "observation_only": frame.observation_only, "screenshot_url": "/api/screenshot", "character_view_url": "/api/character-view"}
     except Exception as exc:
         return {"available": False, "reason": str(exc)}
 
@@ -171,6 +173,60 @@ def screenshot() -> StreamingResponse:
     from app.client.windows_perception import WindowsNosTalePerception
     frame = WindowsNosTalePerception(_runtime_adapter).capture()
     return StreamingResponse(BytesIO(frame.png), media_type="image/png", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/character-view")
+def character_view() -> StreamingResponse:
+    """Return a transparent RGBA subject view plus visual activity headers."""
+    global _previous_frame_png
+    if _runtime_adapter is None:
+        return StreamingResponse(BytesIO(b""), media_type="image/png", status_code=503)
+    try:
+        from app.client.live_character_view import build_character_view
+        from app.client.windows_perception import WindowsNosTalePerception
+
+        frame = WindowsNosTalePerception(_runtime_adapter).capture()
+        view = build_character_view(frame.png, _previous_frame_png)
+        _previous_frame_png = frame.png
+        return StreamingResponse(
+            BytesIO(view.png),
+            media_type="image/png",
+            headers={
+                "Cache-Control": "no-store",
+                "X-NosAi-Activity": view.activity_state,
+                "X-NosAi-Activity-Score": str(view.activity_score),
+                "X-NosAi-Observation-Only": "true",
+            },
+        )
+    except Exception as exc:
+        return StreamingResponse(
+            BytesIO(b""),
+            media_type="image/png",
+            status_code=503,
+            headers={"X-NosAi-Error": f"{type(exc).__name__}: {exc}"},
+        )
+
+
+@app.get("/api/character-state")
+def character_state() -> dict[str, Any]:
+    """Return dashboard-safe visual state; skill names are only reported when observed."""
+    if _runtime_adapter is None:
+        return {"available": False, "observation_only": True, "activity": "OFFLINE", "ability": None}
+    try:
+        from app.client.live_character_view import build_character_view
+        from app.client.windows_perception import WindowsNosTalePerception
+        frame = WindowsNosTalePerception(_runtime_adapter).capture()
+        view = build_character_view(frame.png, _previous_frame_png)
+        return {
+            "available": True,
+            "observation_only": True,
+            "activity": view.activity_state,
+            "activity_score": view.activity_score,
+            "ability": None,
+            "ability_source": "not_observed",
+        }
+    except Exception as exc:
+        return {"available": False, "observation_only": True, "activity": "ERROR", "ability": None, "reason": str(exc)}
 
 
 @app.get("/api/fonti")
