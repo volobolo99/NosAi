@@ -3,7 +3,7 @@ from app.ai_lab.runner import run_baseline
 
 def test_baseline_runs_against_real_brain_without_client_side_effects() -> None:
     runs = run_baseline()
-    assert len(runs) == 4
+    assert len(runs) == 8
     assert all(run.result.decision is not None for run in runs)
     assert all(run.result.safety_status == "PASS" for run in runs)
 
