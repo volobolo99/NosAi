@@ -22,15 +22,17 @@ NosAi is **offline-first and continually improving**. The gameplay core must rem
 | Version/model/strategy registry contract | implemented | 60% |
 | Patch evaluation gate | implemented | 70% |
 | Sandbox request safety validation | hardened contract | 70% |
-| Windows Sandbox CLI backend | implemented, host validation pending | 35% |
+| Windows Sandbox CLI backend | implemented, host validation pending | 40% |
+| Immutable runtime payload integrity verifier | implemented, payload packaging pending | 35% |
 | Deterministic protected replay executor | implemented | 60% |
 | Candidate regression suite | implemented | 55% |
-| Integrated sandbox -> replay -> regression pipeline | implemented, host validation pending | 45% |
+| Integrated sandbox -> replay -> regression pipeline | implemented, host validation pending | 50% |
+| Windows Sandbox CI gate | configured, self-hosted runner required | 35% |
 | Prepared immutable Windows runtime payload | pending | 10% |
 | Real Windows evidence collector | pending | 25% |
 | Real NosTale evidence collector | pending | 15% |
 
-The percentages are engineering maturity estimates, not test-pass claims. The Windows Sandbox backend and integrated validation pipeline remain below production readiness until they are exercised on an actual supported Windows host with a prepared immutable runtime payload.
+The percentages are engineering maturity estimates, not test-pass claims. The OS-level sandbox and integrated validation pipeline remain below production readiness until they are exercised on an actual supported Windows host with a prepared immutable runtime payload.
 
 ## P1 — Offline intelligence
 
