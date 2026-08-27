@@ -42,7 +42,6 @@ def _ram_total_gb() -> float:
 
 def build_profile(hardware: HardwareProfile | None = None) -> AutoSetProfile:
     hw = hardware or detect_hardware()
-    # Keep online inference conservative so the game/runtime remains responsive.
     torch_threads = max(1, min(4, hw.worker_threads))
     return AutoSetProfile(
         platform=platform.platform(),
@@ -79,7 +78,7 @@ def run_benchmark(output: str | Path | None = None) -> dict[str, Any]:
 
     started = time.perf_counter()
     runner = BenchmarkRunner(BenchmarkConfig(name="autoset", episodes=25, seed=42))
-    report = runner.run()
+    report = runner.run_ablation()
     payload = report.to_dict()
     payload["elapsed_s"] = round(time.perf_counter() - started, 4)
     if output is not None:
@@ -88,14 +87,11 @@ def run_benchmark(output: str | Path | None = None) -> dict[str, Any]:
 
 
 def autoset(*, benchmark: bool = True, output: str | Path | None = None) -> dict[str, Any]:
-    """Detect -> benchmark -> select -> apply, with an auditable result."""
+    """Detect -> benchmark -> apply, with an auditable result."""
     profile = build_profile()
     applied = apply_process_settings(profile)
     result: dict[str, Any] = {"profile": profile.to_dict(), "applied": applied}
-    if benchmark:
-        result["benchmark"] = run_benchmark(output)
-    else:
-        result["benchmark"] = None
+    result["benchmark"] = run_benchmark(output) if benchmark else None
     result["status"] = "READY"
     result["safety"] = {
         "process_local_only": True,
