@@ -1,7 +1,7 @@
 {
   "artifact": {
-    "name": "nosai-test-center-d642105173557f6e868107952b9c3f51c69b8b17",
-    "url": "https://github.com/volobolo99/NosAi/actions/runs/33051713835"
+    "name": "nosai-test-center-89a770808492b9062efe877611e80b87c99a2aaf",
+    "url": "https://github.com/volobolo99/NosAi/actions/runs/33053542316"
   },
   "ci": {
     "cli": "SUCCESS",
@@ -10,7 +10,7 @@
     "static": "SUCCESS",
     "status": "FAIL"
   },
-  "commit": "d642105173557f6e868107952b9c3f51c69b8b17",
+  "commit": "89a770808492b9062efe877611e80b87c99a2aaf",
   "coverage": {
     "status": "NOT_RUN"
   },
@@ -24,7 +24,7 @@
   },
   "ref": "main",
   "repository": "volobolo99/NosAi",
-  "run_id": "33051713835",
+  "run_id": "33053542316",
   "sbom": {
     "format": "CycloneDX JSON",
     "status": "PASS"
