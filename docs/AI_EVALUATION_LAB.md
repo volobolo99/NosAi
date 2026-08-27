@@ -9,73 +9,54 @@ The AI Evaluation Lab is an offline/optional experimentation layer for NosAi. It
 ```text
 Scenario / replay
       |
-      v
 World-state fixture
       |
-      +----> Candidate model / prompt A
-      +----> Candidate model / prompt B
-      +----> NosAi baseline
+Candidate model / prompt / RL policy
       |
-      v
 Normalized decision
       |
-      v
-Evaluator
-  |    |    |
-  |    |    +-- safety violations
-  |    +------- expected decision / constraints
-  +------------ latency / confidence / outcome
+Evaluator -> safety / constraints / latency / confidence / outcome
       |
-      v
 Evaluation evidence
-      |
-      +----> dashboard
-      +----> regression dataset
-      +----> CI gate (only for checked-in deterministic fixtures)
+   |        |        |
+Dashboard  Regression  CI
 ```
+
+## Reusable AI research track
+
+The lab is the controlled place to evaluate external AI/RL tooling before it enters NosAi:
+
+- Gymnasium environment compatibility;
+- PettingZoo multi-agent scenarios for PlayAi/GuardAi cooperation;
+- Stable-Baselines3 baseline experiments (e.g. PPO);
+- CleanRL reference implementations and algorithm cross-checks;
+- RL Baselines3 Zoo configurations/benchmark comparisons;
+- Agent Lightning-inspired trajectory/reward experiments;
+- other game-agent repositories as architecture references;
+- MALib only as a future distributed multi-agent candidate.
+
+These are not automatically runtime dependencies. Each candidate must pass the Third-Party Component Audit.
 
 ## Rules
 
-1. The lab may call an external model provider, including AI Studio during human experimentation, but NosAi must remain functional without it.
-2. Secrets and provider credentials are server-side only; never store them in fixtures, HTML, logs, or committed datasets.
-3. Evaluation inputs are sanitized game-state fixtures or recorded observations, not live action commands.
+1. External providers/frameworks are optional; NosAi must remain functional without them.
+2. Secrets and provider credentials are never stored in fixtures, HTML, logs or committed datasets.
+3. Evaluation inputs are sanitized state fixtures or recorded observations, not live action commands.
 4. The evaluator compares decisions; it does not execute game actions.
-5. A model result cannot bypass the Planner or Safety Gate.
-6. Every result carries scenario id, model/prompt identifier, timestamp, evidence version, and evaluation status.
-7. Deterministic fixtures used in CI must not depend on network availability or an external model.
+5. A model or RL result cannot bypass Planner or Safety Gate.
+6. Results carry scenario id, candidate id, timestamp, evidence version and evaluation status.
+7. Deterministic CI fixtures must not depend on network availability or an external model.
+8. Framework adoption requires license, maintenance, dependency, security, API and performance review.
 
 ## Scenario schema
 
-Required fields:
+Required: `scenario_id`, `world_state`, `available_actions`, `constraints`, `expected_outcome` or constraints, `source`, `schema_version`.
 
-- `scenario_id`
-- `world_state`
-- `available_actions`
-- `constraints`
-- `expected_outcome` or expected constraints
-- `source`
-- `schema_version`
-
-Optional fields:
-
-- `replay_id`
-- `tags`
-- `difficulty`
-- `notes`
+Optional: `replay_id`, `tags`, `difficulty`, `notes`.
 
 ## Result schema
 
-Each evaluation result should contain:
-
-- `scenario_id`
-- `candidate_id`
-- `decision`
-- `confidence`
-- `status`: `PASS`, `FAIL`, or `NOT_RUN`
-- `safety_status`
-- `latency_ms`
-- `reason_codes`
-- `evidence_version`
+Each result should contain `scenario_id`, `candidate_id`, `decision`, `confidence`, `status` (`PASS`, `FAIL`, `NOT_RUN`), `safety_status`, `latency_ms`, `reason_codes`, and `evidence_version`.
 
 ## Metrics
 
@@ -87,27 +68,17 @@ Primary metrics:
 - goal completion rate;
 - confidence calibration;
 - p50/p95 decision latency;
-- regression rate against baseline.
-
-Secondary metrics are only added when they support a concrete engineering decision.
+- regression rate against baseline;
+- for RL experiments: reward, sample efficiency, stability and reproducibility;
+- for PlayAi/GuardAi cooperation: GuardAi intervention value and unnecessary intervention rate.
 
 ## Dashboard integration
 
-The dashboard should expose a read-only AI Lab view containing:
-
-- scenario counts;
-- candidate comparison;
-- pass/fail/not-run totals;
-- accuracy and safety trends;
-- latency distribution;
-- baseline delta;
-- evidence provenance.
-
-Live runtime controls remain outside the lab view.
+Expose a read-only AI Lab view with scenario counts, candidate comparison, pass/fail/not-run totals, accuracy/safety trends, latency, baseline delta, RL metrics and evidence provenance. Live runtime controls remain outside the lab view.
 
 ## CI integration
 
-CI should run only deterministic, local evaluation fixtures. External-model evaluations are informative and must be marked `NOT_RUN` when credentials/network access are unavailable. They must not silently become `PASS`.
+CI runs deterministic local fixtures. External-model/framework evaluations are informative and become `NOT_RUN` when credentials/network access are unavailable; they must not silently become `PASS`.
 
 Recommended pipeline:
 
@@ -117,13 +88,16 @@ fixtures -> evaluator -> JUnit/JSON evidence -> Test Center -> artifact
 
 ## Initial implementation phases
 
-1. Add scenario/result schemas and validation.
-2. Add deterministic evaluator using fixtures and the current NosAi baseline.
-3. Add dashboard read-only endpoint and AI Lab page.
-4. Add replay comparison and regression fixtures.
-5. Add optional external-provider adapter for human experiments.
-6. Add CI evidence and trend reporting.
+1. Scenario/result schemas and validation.
+2. Deterministic evaluator using the current NosAi baseline.
+3. Dashboard read-only AI Lab view.
+4. Replay comparison and regression fixtures.
+5. Gymnasium/PettingZoo environment prototypes.
+6. SB3 PPO baseline and CleanRL cross-check.
+7. RL Zoo benchmark/configuration comparison.
+8. Optional trajectory-level experiments inspired by Agent Lightning.
+9. Third-party audit and promotion decision for each adopted component.
 
 ## Definition of Done
 
-The AI Evaluation Lab is complete for the first milestone when deterministic scenarios can be evaluated offline, results are provenance-tagged, failures are visible in Test Center, and no external provider is required to start or operate NosAi.
+The first research milestone is complete when deterministic scenarios run offline, results are provenance-tagged, failures are visible in Test Center, candidate frameworks are audited, and no external framework/provider is required to start or operate NosAi.
