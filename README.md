@@ -74,15 +74,38 @@ The adapter is intentionally **observation-only**. It does not inject keyboard/m
 6. Keep repository configuration single-sourced and reproducible.
 7. Treat source-derived gameplay mechanics as hypotheses until validated by observations.
 8. Never promote an unvalidated candidate into `main`.
+9. Keep the gameplay core offline-first: Internet may improve NosAi, but must never be required for basic gameplay.
+10. Never consolidate learned knowledge, models or strategies without anti-forgetting regression, provenance and rollback information.
+
+## Current architecture direction
+
+NosAi is now formally **offline-first and continually improving**:
+
+`real experience -> observation -> online research (when available) -> candidate -> simulation/replay -> evaluation -> anti-forgetting -> offline staging -> real Windows -> real NosTale -> consolidation -> new offline baseline`
+
+Online services are an Evolution Lab, not a direct source of gameplay behavior. Knowledge moves through explicit maturity states (`candidate -> experimental -> validated -> consolidated`) and the Promotion Firewall prevents simulation or online research from directly changing the production core.
+
+See:
+
+- `docs/NOSAI_OFFLINE_FIRST_EVOLUTION_ARCHITECTURE_V2.md`
+- `docs/NOSAI_MASTER_ROADMAP_V2.md`
+- `docs/AI_GITHUB_ECOSYSTEM_CATALOG_V1.md`
 
 ## Current roadmap
 
-1. Repository foundation and quality gates. **Complete.**
-2. Source quality and architecture audit. **In progress.**
-3. Establish the strict live-client adapter and integration contract. **In progress.**
-4. Validate real-client observation and visual/game-state perception. **Next.**
-5. Feed validated NosTale state into the planner/reward/evaluation pipeline. **Next.**
-6. Add a separately gated action transport only after observation is proven.
-7. Establish benchmark and regression baselines.
-8. Optimize measured bottlenecks.
-9. Release hardening.
+1. Repository/release foundation. **95%**
+2. Test/evidence foundation. **80%**
+3. Research → candidate → simulation pipeline. **70%**
+4. Offline-first AI core implementation. **55%**
+5. Local inference abstraction + llama.cpp benchmark. **30%**
+6. RL adapter and offline training/evaluation. **45%**
+7. Continual learning + anti-forgetting. **25%**
+8. Memory/retrieval benchmark. **40%**
+9. Model/strategy registry. **20%**
+10. Unified observability. **45%**
+11. Real Windows runtime validation. **25%**
+12. Real NosTale perception/validation. **15%**
+13. Action transport. **5%** (intentionally gated)
+14. Autonomous evolution loop. **20%**
+
+These are engineering maturity estimates, not claims that real-world tests have passed.
