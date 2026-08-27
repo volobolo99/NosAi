@@ -1,19 +1,26 @@
 # NosAi
 
-NosAi is the full-runtime fusion project currently at version **4.20.0**.
+NosAi is the full-runtime fusion project currently at confirmed version **4.19.2**.
 
 ## Repository status
 
 The repository is source-first: the runtime lives in `app/`, tests live in `tests/`, and CI validates the source tree directly. Runtime behavior is protected by regression tests while the architecture and source quality are audited.
 
-## Baseline
+## Confirmed baseline
 
-- Version: `4.20.0`
-- Release: `source-grounded-nostale-strategy`
+- Branch: `main`
+- Confirmed version: `4.19.2`
+- Release: `full-runtime-fusion-hardened`
 - Python: `>=3.10`
 - Runtime package: `app/`
 - Test suite: `tests/`
 - Build/configuration source of truth: `pyproject.toml`
+
+`main` is the confirmed/stable baseline only. New development and candidate releases are worked on in `develop/nosai-next` and promoted to `main` only after validation and explicit confirmation.
+
+## Development workflow
+
+See `docs/BRANCHING_AND_RELEASE_POLICY.md` for the candidate lifecycle, validation gate, versioning rule and promotion procedure.
 
 ## NosTale strategy model
 
@@ -44,39 +51,11 @@ Before live runtime is allowed, the pre-flight performs:
 
 A failed live check returns exit code `1` and reports a stable check ID, phase, expected value, actual value, exception type, and exception text. The live probe is deliberately non-destructive.
 
-Example:
-
-```text
-set NOSAI_CLIENT_ADAPTER=my_adapter:adapter
-nosai-preflight --require-client
-```
-
-For machine-readable diagnostics:
-
-```text
-nosai-preflight --require-client --json
-```
-
 ## Real NosTale observation adapter
 
 `WindowsNosTaleAdapter` is the first concrete boundary for a real Windows NosTale client. It detects only configured process names (`NostaleClientX.exe` and `NostaleClient.exe` by default), requires a visible client window, and returns normalized PID/window geometry metadata.
 
 The adapter is intentionally **observation-only**. It does not inject keyboard/mouse input, patch memory, open a game-action transport, or execute a game action. This is a hard safety boundary while visual/game-state perception is validated.
-
-Local probe:
-
-```text
-nosai-client-probe
-nosai-client-probe --json
-```
-
-A non-zero exit means the client could not be observed successfully; it does not mean NosAi attempted to control the game. Custom process names can be supplied with:
-
-```text
-set NOSAI_NOSTALE_PROCESS_NAMES=NostaleClientX.exe;NostaleClient.exe
-```
-
-The required generic adapter contract remains in `app/client/adapter.py`; the repository does not ship a fake live-client adapter.
 
 ## Development principles
 
@@ -87,15 +66,4 @@ The required generic adapter contract remains in `app/client/adapter.py`; the re
 5. Do not delete historical documentation or implementation evidence without proving it is redundant.
 6. Keep repository configuration single-sourced and reproducible.
 7. Treat source-derived gameplay mechanics as hypotheses until validated by observations.
-
-## Current roadmap
-
-1. Repository foundation and quality gates. **Complete.**
-2. Source quality and architecture audit. **In progress.**
-3. Establish the strict live-client adapter and integration contract. **In progress.**
-4. Validate real-client observation and visual/game-state perception. **Next.**
-5. Feed validated NosTale state into the planner/reward/evaluation pipeline. **Next.**
-6. Add a separately gated action transport only after observation is proven.
-7. Establish benchmark and regression baselines.
-8. Optimize measured bottlenecks.
-9. Release hardening.
+8. Never promote an unvalidated candidate into `main`.
