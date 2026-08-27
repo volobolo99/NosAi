@@ -34,8 +34,8 @@ def test_ai_lab_is_offline_first_and_has_valid_scenarios() -> None:
     assert data["status"] == "READY"
     assert data["mode"] == "offline-deterministic"
     assert data["external_provider"] == "NOT_REQUIRED"
-    assert data["scenarios"] == 4
-    assert data["results"]["NOT_RUN"] == 4
+    assert data["scenarios"] == 8
+    assert data["results"]["NOT_RUN"] == 8
     assert data["scenario_errors"] == []
 
 
