@@ -1,6 +1,7 @@
 """Convert observation-only perception output into the canonical WorldState."""
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 from app.client.multi_entity import MultiEntityObservation
@@ -9,11 +10,11 @@ from .state import EntityState, WorldState
 
 
 class ObservationMapper:
-    """Fuse a visual observation into a previous world-state snapshot.
+    """Fuse observation-only perception output into a WorldState snapshot.
 
     The mapper never performs client I/O. It only translates detections into
-    structured state and preserves confidence/source metadata for later Brain
-    and Memory consumers.
+    structured state and preserves confidence/source metadata for Brain and
+    Memory consumers.
     """
 
     def update(
@@ -30,9 +31,7 @@ class ObservationMapper:
             raise ValueError("observation tick cannot move backwards")
         state.tick = next_tick
         state.revision += 1
-        state.observed_at = __import__("datetime").datetime.now(
-            __import__("datetime").timezone.utc
-        ).isoformat()
+        state.observed_at = datetime.now(timezone.utc).isoformat()
         state.source = "visual_perception"
         if map_id is not None:
             state.map_id = map_id
