@@ -17,24 +17,25 @@ NosAi is **offline-first and continually improving**. The gameplay core must rem
 | REAL / CI / SIMULATED evidence separation | implemented | 90% |
 | Research/candidate provenance | implemented | 85% |
 | Promotion Firewall contract | implemented | 70% |
-| Protected replay store | implemented | 65% |
-| Anti-forgetting gate | implemented | 60% |
+| Protected replay store | implemented | 70% |
+| Anti-forgetting gate | implemented | 65% |
 | Version/model/strategy registry contract | implemented | 60% |
-| Patch evaluation gate | implemented | 60% |
-| Sandbox request safety validation | hardened contract | 55% |
-| Real disposable sandbox backend | pending | 15% |
-| Original-error replay executor | pending | 20% |
-| Full regression execution per candidate | pending | 25% |
+| Patch evaluation gate | implemented | 65% |
+| Sandbox request safety validation | hardened contract | 70% |
+| Windows Sandbox CLI backend | implemented, host validation pending | 35% |
+| Deterministic protected replay executor | implemented, runtime integration pending | 50% |
+| Candidate regression suite | implemented, candidate-runtime integration pending | 45% |
+| Prepared immutable Windows runtime payload | pending | 10% |
 | Real Windows evidence collector | pending | 25% |
 | Real NosTale evidence collector | pending | 15% |
 
-The percentages are engineering maturity estimates, not test-pass claims.
+The percentages are engineering maturity estimates, not test-pass claims. The Windows Sandbox backend is intentionally reported below production readiness until it has been exercised on an actual supported Windows host with a prepared immutable runtime payload.
 
 ## P1 — Offline intelligence
 
 1. `NosAiLLM` provider contract + local llama.cpp adapter.
 2. Local memory/retrieval adapter and benchmark.
-3. Stable-Baselines3 adapter and offline training harness.
+3. Stable-Baselines3 adapter and offline training/evaluation harness.
 4. Continual-learning benchmark/replay stream.
 5. Drift detection.
 6. OpenTelemetry-compatible correlation.
