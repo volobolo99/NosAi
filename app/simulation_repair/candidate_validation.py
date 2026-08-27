@@ -1,4 +1,4 @@
-"""End-to-end candidate validation: sandbox -> replay -> regression."""
+"""End-to-end candidate validation: sandbox -> replay -> regression -> evidence."""
 from __future__ import annotations
 
 import json
@@ -8,7 +8,6 @@ from typing import Callable, Iterable
 from .replay import ReplayCase, anti_forgetting_gate
 from .replay_runner import ReplayResult
 from .sandbox import SandboxBackend, SandboxRequest, SandboxResult
-
 
 RequestFactory = Callable[[ReplayCase], SandboxRequest]
 
@@ -23,16 +22,16 @@ class CandidateValidationReport:
 
     @property
     def passed(self) -> bool:
-        return (
-            bool(self.sandbox_results)
-            and all(result.status == "PASS" and result.isolation not in {"", "none", "unverified"} for result in self.sandbox_results)
-            and self.replay_passed
-            and self.anti_forgetting_passed
+        sandbox_ok = bool(self.sandbox_results) and all(
+            result.status == "PASS"
+            and result.isolation not in {"", "none", "unverified"}
+            for result in self.sandbox_results
         )
+        return sandbox_ok and self.replay_passed and self.anti_forgetting_passed
 
 
 class CandidateValidationPipeline:
-    """Execute each protected replay case in the injected sandbox backend."""
+    """Execute protected cases in isolation and evaluate regression gates."""
 
     def __init__(self, sandbox: SandboxBackend, request_factory: RequestFactory) -> None:
         self.sandbox = sandbox
@@ -51,29 +50,31 @@ class CandidateValidationPipeline:
         for case in cases:
             sandbox_result = self.sandbox.execute(self.request_factory(case))
             sandbox_results.append(sandbox_result)
-            if sandbox_result.status != "PASS":
-                actual = {"sandbox_status": sandbox_result.status, "stderr": sandbox_result.stderr}
-            else:
-                try:
-                    parsed = json.loads(sandbox_result.stdout)
-                    actual = parsed if isinstance(parsed, dict) else {"result": parsed}
-                except json.JSONDecodeError as exc:
-                    actual = {"stdout": sandbox_result.stdout, "parse_error": str(exc)}
-            passed = _matches_expected(case.expected, actual)
-            detail = "expected output matched" if passed else "expected output mismatch"
+            actual = self._actual_from_sandbox(sandbox_result)
+            passed = sandbox_result.status == "PASS" and _matches_expected(case.expected, actual)
+            detail = "expected output matched" if passed else "sandbox execution or expected output failed"
             replay_results.append(ReplayResult(case.case_id, passed, case.expected, actual, detail))
 
         anti_ok, regressions = anti_forgetting_gate(
             baseline_scores, candidate_scores, tolerance=tolerance
         )
-        replay_ok = all(result.passed for result in replay_results)
         return CandidateValidationReport(
             tuple(sandbox_results),
             tuple(replay_results),
-            replay_ok,
+            all(result.passed for result in replay_results),
             anti_ok,
             tuple(regressions),
         )
+
+    @staticmethod
+    def _actual_from_sandbox(result: SandboxResult) -> dict:
+        if result.status != "PASS":
+            return {"sandbox_status": result.status, "stderr": result.stderr}
+        try:
+            parsed = json.loads(result.stdout)
+        except json.JSONDecodeError as exc:
+            return {"stdout": result.stdout, "parse_error": str(exc)}
+        return parsed if isinstance(parsed, dict) else {"result": parsed}
 
 
 def _matches_expected(expected: dict, actual: dict) -> bool:
