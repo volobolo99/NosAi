@@ -54,6 +54,7 @@ Before live runtime is allowed, the pre-flight performs Python/dependency, runti
 7. Never promote an unvalidated candidate into `main`.
 8. Keep the gameplay core offline-first: Internet may improve NosAi, but must never be required for basic gameplay.
 9. Never consolidate learned knowledge, models or strategies without anti-forgetting regression, provenance and rollback information.
+10. Never report a sandbox candidate as PASS when the real OS-level sandbox or required runtime payload was not actually available.
 
 ## Current architecture direction
 
@@ -61,13 +62,14 @@ NosAi is formally **offline-first and continually improving**. Online services f
 
 `real experience -> observation -> online research -> candidate -> sandbox -> replay -> regression -> anti-forgetting -> offline staging -> real Windows -> real NosTale -> explicit confirmation -> consolidation`
 
-The P0 safety/evidence block is now implemented at the contract and evaluation level: Promotion Firewall, protected replay, anti-forgetting evaluation, version registry, patch evaluation and hardened sandbox request validation. The actual OS-level disposable sandbox and real-machine replay still require runtime validation.
+The P0 block now contains the promotion/evidence contracts, protected replay execution, candidate regression evaluation and a real Windows Sandbox CLI backend. The OS-level backend deliberately fails closed until it is exercised on a supported Windows host with an immutable runtime payload.
 
 See:
 
 - `docs/NOSAI_OFFLINE_FIRST_EVOLUTION_ARCHITECTURE_V2.md`
 - `docs/NOSAI_MASTER_ROADMAP_V3.md`
 - `docs/P0_EVOLUTION_GATES.md`
+- `docs/WINDOWS_SANDBOX_REPLAY_REGRESSION.md`
 - `docs/AI_GITHUB_ECOSYSTEM_CATALOG_V1.md`
 
 ## Current roadmap
@@ -77,12 +79,15 @@ See:
 | Repository/release structure | 95% |
 | Test/evidence foundation | 80% |
 | Research -> candidate -> simulation | 70% |
-| P0 governance/evolution gates | 60% |
+| Promotion/evolution governance | 70% |
+| Protected replay | 70% |
+| Candidate regression | 45% |
+| Windows Sandbox backend | 35% (host validation pending) |
 | Offline-first AI core | 55% |
 | RL layer | 45% |
 | Memory/retrieval | 40% |
 | Local inference | 30% |
-| Continual learning / anti-forgetting | 35% |
+| Continual learning / anti-forgetting | 65% (gate; training loop pending) |
 | Unified observability | 45% |
 | Model/strategy registry | 60% (contract + local store) |
 | Real Windows runtime | 25% |
