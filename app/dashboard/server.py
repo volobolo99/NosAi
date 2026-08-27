@@ -18,7 +18,7 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.11")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.12")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 ASSET_ROOT = WEB_ROOT / "assets"
@@ -137,7 +137,7 @@ def ai_lab_data() -> dict[str, Any]:
 
 @app.get("/api/simulation")
 def simulation_data() -> dict[str, Any]:
-    """Return simulation evidence only; never mutates source code."""
+    """Return simulation and ensemble evidence; never mutates source code."""
     from app.simulation_repair import SimulationRepairEngine
     engine = getattr(app.state, "simulation_engine", None)
     if engine is None:
