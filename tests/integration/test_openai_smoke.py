@@ -12,7 +12,6 @@ import pytest
 
 
 @pytest.mark.integration
-
 def test_openai_responses_api_smoke():
     api_key = os.getenv("OPENAI_API_KEY")
     if not api_key:
@@ -25,7 +24,7 @@ def test_openai_responses_api_smoke():
     response = client.responses.create(
         model=model,
         input="Return exactly the word OK.",
-        max_output_tokens=8,
+        max_output_tokens=16,
     )
 
-    assert response.output_text.strip(), "OpenAI returned no text output"
+    assert response.output_text.strip() == "OK", "OpenAI did not return the expected smoke-test output"
