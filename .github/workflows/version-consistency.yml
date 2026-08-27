@@ -19,7 +19,7 @@ jobs:
           from pathlib import Path
 
           pyproject = Path("pyproject.toml").read_text(encoding="utf-8")
-          match = re.search(r'^version\\s*=\\s*[\"\\\']([^\"\\\']+)[\"\\\']', pyproject, re.M)
+          match = re.search(r'^version\s*=\s*["\']([^"\']+)["\']', pyproject, re.M)
           if not match:
               raise SystemExit("Unable to find project version in pyproject.toml")
           canonical = match.group(1)
