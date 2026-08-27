@@ -1,15 +1,11 @@
-"""Orchestration layer for research and isolated candidate evaluation.
-
-This module deliberately stops before automatic code changes. External research
-is represented as injected sources so production credentials, network policy,
-and provider choice stay outside the core engine.
-"""
+"""Orchestration for research, sandbox evaluation and multi-candidate synthesis."""
 from __future__ import annotations
 
 import hashlib
 from dataclasses import replace
 from typing import Any, Callable, Iterable
 
+from .ensemble import EnsembleResult, synthesize
 from .models import CandidateResult, ErrorEvent, ResearchSource, SimulationRun, utc_now
 
 Researcher = Callable[[ErrorEvent], Iterable[ResearchSource]]
@@ -17,12 +13,13 @@ Simulator = Callable[[ErrorEvent, CandidateResult], dict[str, Any]]
 
 
 class SimulationRepairEngine:
-    """Deterministic coordinator for error -> research -> simulation evidence."""
+    """Deterministic coordinator; never applies production code changes."""
 
     def __init__(self, researcher: Researcher | None = None, simulator: Simulator | None = None) -> None:
         self.researcher = researcher
         self.simulator = simulator
         self.runs: dict[str, SimulationRun] = {}
+        self.ensembles: dict[str, EnsembleResult] = {}
 
     @staticmethod
     def fingerprint(error: ErrorEvent) -> str:
@@ -53,17 +50,13 @@ class SimulationRepairEngine:
                 result = replace(candidate, status="NOT_RUN", notes=[*candidate.notes, "No simulator configured; candidate was not executed."])
             else:
                 outcome = self.simulator(error, candidate)
-                result = replace(
-                    candidate,
-                    status=outcome.get("status", "ERROR"),
-                    evidence=[*candidate.evidence, *outcome.get("evidence", [])],
-                    checks={**candidate.checks, **outcome.get("checks", {})},
-                    notes=[*candidate.notes, *outcome.get("notes", [])],
-                )
+                result = replace(candidate, status=outcome.get("status", "ERROR"), evidence=[*candidate.evidence, *outcome.get("evidence", [])], checks={**candidate.checks, **outcome.get("checks", {})}, notes=[*candidate.notes, *outcome.get("notes", [])])
             evaluated.append(result)
         run.candidates = evaluated
+        run.phase, run.progress_percent = "ensemble", 85
+        self.ensembles[run_id] = synthesize(evaluated)
         run.phase, run.progress_percent = "evidence", 90
-        run.status = "READY_FOR_REVIEW" if evaluated and any(c.status == "PASS" for c in evaluated) else "FAIL"
+        run.status = "READY_FOR_REVIEW" if self.ensembles[run_id].status in {"READY_FOR_REVIEW", "CONFLICT_REVIEW"} else "FAIL"
         run.updated_at = utc_now()
         return run
 
@@ -74,9 +67,21 @@ class SimulationRepairEngine:
         return run
 
     def snapshot(self) -> dict[str, Any]:
-        runs = [run.to_dict() for run in self.runs.values()]
-        latest = runs[-1] if runs else None
-        return {"runs": runs, "latest": latest, "count": len(runs)}
+        runs = []
+        for run in self.runs.values():
+            item = run.to_dict()
+            ensemble = self.ensembles.get(run.run_id)
+            if ensemble:
+                item["ensemble"] = {
+                    "status": ensemble.status,
+                    "selected_candidate_ids": ensemble.selected_candidate_ids,
+                    "compatible_candidate_ids": ensemble.compatible_candidate_ids,
+                    "composite_plan": ensemble.composite_plan,
+                    "conflicts": ensemble.conflicts,
+                    "score": ensemble.score,
+                }
+            runs.append(item)
+        return {"runs": runs, "latest": runs[-1] if runs else None, "count": len(runs)}
 
     def _get(self, run_id: str) -> SimulationRun:
         try:
