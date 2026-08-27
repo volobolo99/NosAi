@@ -1,51 +1,47 @@
 {
   "artifact": {
-    "name": "nosai-test-center-86108d415066f68eaebedb37c0ffa7ddb0d6202a",
-    "url": "https://github.com/volobolo99/NosAi/actions/runs/33048217561"
+    "name": "nosai-test-center-3638972801069126e05e6e24fdb96ca5024c7cb9",
+    "url": "https://github.com/volobolo99/NosAi/actions/runs/33048452143"
   },
   "ci": {
     "cli": "SUCCESS",
     "e2e": "NOT_RUN",
-    "quality": "NOT_RUN",
-    "static": "FAILURE",
-    "status": "NOT_RUN"
+    "quality": "FAILURE",
+    "static": "SUCCESS",
+    "status": "FAIL"
   },
-  "commit": "86108d415066f68eaebedb37c0ffa7ddb0d6202a",
+  "commit": "3638972801069126e05e6e24fdb96ca5024c7cb9",
   "coverage": {
     "status": "NOT_RUN"
   },
   "junit": {
-    "status": "NOT_RUN"
+    "duration": 0.0,
+    "errors": 0,
+    "failures": 0,
+    "skipped": 0,
+    "status": "PASS",
+    "tests": 0
   },
   "ref": "main",
   "repository": "volobolo99/NosAi",
-  "run_id": "33048217561",
+  "run_id": "33048452143",
   "sbom": {
     "format": "CycloneDX JSON",
-    "status": "FAIL"
+    "status": "PASS"
   },
   "schema": 3,
   "security": {
-    "audit_exit": 1,
+    "audit_exit": 0,
     "pip_check": "success",
     "sbom": {
       "format": "CycloneDX JSON",
-      "status": "FAIL"
+      "status": "PASS"
     },
-    "sbom_exit": 1,
+    "sbom_exit": 0,
     "schema": 1,
-    "status": "FAIL",
-    "vulnerabilities": [
-      {
-        "fix_versions": [
-          "9.0.3"
-        ],
-        "id": "PYSEC-2026-1845",
-        "package": "pytest",
-        "version": "8.4.2"
-      }
-    ],
-    "vulnerability_count": 1
+    "status": "PASS",
+    "vulnerabilities": [],
+    "vulnerability_count": 0
   },
   "workflow": "NosAi Quality Gates"
 }
