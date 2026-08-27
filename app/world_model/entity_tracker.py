@@ -3,7 +3,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from math import hypot
-from typing import Any
 
 from .state import EntityState, WorldState
 
@@ -15,57 +14,47 @@ class TrackingConfig:
 
 
 class EntityTracker:
-    """Associate detections with stable IDs across consecutive observations."""
+    """Associate detections with stable IDs and retain short occlusions."""
 
     def __init__(self, config: TrackingConfig | None = None) -> None:
         self.config = config or TrackingConfig()
+        if self.config.max_distance <= 0 or self.config.max_missed_ticks < 0:
+            raise ValueError("invalid tracking configuration")
         self._next_id = 1
         self._missed: dict[str, int] = {}
 
     def track(self, previous: WorldState | None, detections: list[EntityState]) -> list[EntityState]:
-        previous_entities = {} if previous is None else previous.entities
+        previous_entities = {} if previous is None else self.active_previous(previous)
         candidates = list(previous_entities.values())
         result: list[EntityState] = []
         matched: set[str] = set()
 
         for detection in detections:
-            best: EntityState | None = None
-            best_distance = float("inf")
-            for candidate in candidates:
-                if candidate.entity_id in matched or candidate.entity_type != detection.entity_type:
-                    continue
-                distance = self._distance(candidate, detection)
-                if distance <= self.config.max_distance and distance < best_distance:
-                    best, best_distance = candidate, distance
-            entity_id = best.entity_id if best else self._new_id(detection.entity_type)
-            if best:
-                matched.add(best.entity_id)
-            self._missed[entity_id] = 0
-            result.append(
-                EntityState(
-                    entity_id=entity_id,
-                    entity_type=detection.entity_type,
-                    attributes=dict(detection.attributes),
-                    confidence=detection.confidence,
-                    source=detection.source,
-                    last_seen_tick=detection.last_seen_tick,
-                )
+            best = min(
+                (candidate for candidate in candidates if candidate.entity_id not in matched and candidate.entity_type == detection.entity_type),
+                key=lambda candidate: self._distance(candidate, detection),
+                default=None,
             )
+            if best is not None and self._distance(best, detection) <= self.config.max_distance:
+                entity_id = best.entity_id
+                matched.add(entity_id)
+            else:
+                entity_id = self._new_id(detection.entity_type)
+            self._missed[entity_id] = 0
+            result.append(EntityState(entity_id, detection.entity_type, dict(detection.attributes), detection.confidence, detection.source, detection.last_seen_tick))
 
-        for entity_id in previous_entities:
+        for entity_id, entity in previous_entities.items():
             if entity_id not in matched and entity_id not in {e.entity_id for e in result}:
-                self._missed[entity_id] = self._missed.get(entity_id, 0) + 1
-
+                missed = self._missed.get(entity_id, 0) + 1
+                self._missed[entity_id] = missed
+                if missed <= self.config.max_missed_ticks:
+                    result.append(EntityState(entity.entity_id, entity.entity_type, dict(entity.attributes), max(0.0, entity.confidence * 0.95), "tracking_prediction", entity.last_seen_tick))
         return result
 
     def active_previous(self, previous: WorldState | None) -> dict[str, EntityState]:
         if previous is None:
             return {}
-        return {
-            entity_id: entity
-            for entity_id, entity in previous.entities.items()
-            if self._missed.get(entity_id, 0) <= self.config.max_missed_ticks
-        }
+        return {entity_id: entity for entity_id, entity in previous.entities.items() if self._missed.get(entity_id, 0) <= self.config.max_missed_ticks}
 
     def _new_id(self, entity_type: str) -> str:
         entity_id = f"{entity_type}:{self._next_id}"
