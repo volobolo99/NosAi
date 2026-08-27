@@ -1,9 +1,4 @@
-"""Provider-neutral, serializable contracts shared by NosAi runtime layers.
-
-G1 deliberately contains no live-client or action-execution code. These types
-form the stable boundary used by later orchestration, AI, planning and safety
-layers.
-"""
+"""Provider-neutral, serializable contracts shared by NosAi runtime layers."""
 
 from __future__ import annotations
 
@@ -142,4 +137,5 @@ def noop_decision(
         confidence=1.0,
         provider=provider,
         model=None,
+        created_at=datetime.fromtimestamp(0, tz=timezone.utc),
     )
