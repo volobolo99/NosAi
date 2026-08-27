@@ -1,0 +1,53 @@
+name: NosAi Ruff Autofix
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop/nosai-next]
+    paths:
+      - 'app/**/*.py'
+      - 'tests/**/*.py'
+      - 'pyproject.toml'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: nosai-ruff-autofix-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install Ruff
+        run: python -m pip install 'ruff>=0.16,<1'
+      - name: Apply safe Ruff fixes and formatting
+        run: |
+          python -m ruff check --fix app tests
+          python -m ruff format app tests
+      - name: Verify lint after safe fixes
+        run: python -m ruff check app tests
+      - name: Verify syntax
+        run: python -m compileall -q app tests
+      - name: Commit safe cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'No Ruff changes required.'
+            exit 0
+          fi
+          git config user.name 'NosAi CI'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app tests pyproject.toml
+          git commit -m 'style: apply safe Ruff cleanup [skip ci]'
+          git push
