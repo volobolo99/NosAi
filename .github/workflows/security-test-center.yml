@@ -13,9 +13,9 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout
-        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
       - name: Set up Python
-        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
           python-version: '3.11'
           cache: pip
@@ -43,7 +43,6 @@ jobs:
           import json
           import os
           from pathlib import Path
-
           audit = Path('pip-audit.json')
           vulns = []
           parse_ok = audit.exists()
@@ -52,35 +51,21 @@ jobs:
                   data = json.loads(audit.read_text(encoding='utf-8'))
                   for dep in data.get('dependencies', []):
                       for vuln in dep.get('vulns', []):
-                          vulns.append({
-                              'package': dep.get('name'),
-                              'version': dep.get('version'),
-                              'id': vuln.get('id'),
-                              'fix_versions': vuln.get('fix_versions', []),
-                          })
+                          vulns.append({'package': dep.get('name'), 'version': dep.get('version'), 'id': vuln.get('id'), 'fix_versions': vuln.get('fix_versions', [])})
               except (OSError, ValueError, TypeError):
                   parse_ok = False
           sbom_exists = Path('sbom.cdx.json').exists()
           pip_check = os.environ.get('PIP_CHECK_OUTCOME', 'unknown')
           audit_exit = int(os.environ.get('AUDIT_EXIT', '1'))
           sbom_exit = int(os.environ.get('SBOM_EXIT', '1'))
-          evidence = {
-              'schema': 1,
-              'status': 'PASS' if pip_check == 'success' and audit_exit == 0 and parse_ok and not vulns and sbom_exists and sbom_exit == 0 else 'FAIL',
-              'pip_check': pip_check,
-              'audit_exit': audit_exit,
-              'sbom_exit': sbom_exit,
-              'vulnerability_count': len(vulns),
-              'vulnerabilities': vulns,
-              'sbom': {'status': 'PASS' if sbom_exists and sbom_exit == 0 else 'FAIL', 'format': 'CycloneDX JSON'},
-          }
+          evidence = {'schema': 1, 'status': 'PASS' if pip_check == 'success' and audit_exit == 0 and parse_ok and not vulns and sbom_exists and sbom_exit == 0 else 'FAIL', 'pip_check': pip_check, 'audit_exit': audit_exit, 'sbom_exit': sbom_exit, 'vulnerability_count': len(vulns), 'vulnerabilities': vulns, 'sbom': {'status': 'PASS' if sbom_exists and sbom_exit == 0 else 'FAIL', 'format': 'CycloneDX JSON'}}
           Path('security-evidence.json').write_text(json.dumps(evidence, indent=2, sort_keys=True), encoding='utf-8')
           PY
         env:
           PIP_CHECK_OUTCOME: ${{ steps.pip-check.outcome }}
       - name: Publish security evidence
         if: always()
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: nosai-security-evidence-${{ github.sha }}
           path: |
