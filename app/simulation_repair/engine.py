@@ -9,6 +9,7 @@ from .candidate_generator import generate_candidates
 from .ensemble import EnsembleResult, synthesize
 from .models import CandidateResult, ErrorEvent, ResearchSource, SimulationRun, utc_now
 from .research import GitHubResearchProvider, build_research_queries
+from .research_pipeline import ResearchPipeline, ResearchPipelineResult
 
 Researcher = Callable[[ErrorEvent], Iterable[ResearchSource]]
 Simulator = Callable[[ErrorEvent, CandidateResult], dict[str, Any]]
@@ -17,10 +18,11 @@ Simulator = Callable[[ErrorEvent, CandidateResult], dict[str, Any]]
 class SimulationRepairEngine:
     """Deterministic coordinator; never applies production code changes."""
 
-    def __init__(self, researcher: Researcher | None = None, simulator: Simulator | None = None, github_research: GitHubResearchProvider | None = None) -> None:
+    def __init__(self, researcher: Researcher | None = None, simulator: Simulator | None = None, github_research: GitHubResearchProvider | None = None, research_pipeline: ResearchPipeline | None = None) -> None:
         self.researcher = researcher
         self.simulator = simulator
         self.github_research = github_research or GitHubResearchProvider()
+        self.research_pipeline = research_pipeline
         self.runs: dict[str, SimulationRun] = {}
         self.ensembles: dict[str, EnsembleResult] = {}
 
@@ -45,22 +47,14 @@ class SimulationRepairEngine:
         return run
 
     def research_online_and_generate(self, run_id: str, error: ErrorEvent, *, limit_per_query: int = 6, candidate_limit: int = 12) -> list[CandidateResult]:
-        """Search live GitHub and turn evidence into traceable proposals.
-
-        Remote material is metadata/evidence only. No remote source is executed,
-        imported as Python, or trusted as a patch. A configured sandbox must
-        evaluate any later implementation proposal.
-        """
+        """Search live GitHub and turn evidence into traceable proposals."""
         run = self._get(run_id)
         run.status, run.phase, run.progress_percent = "RUNNING", "online_research", 20
         hits = []
         for query in build_research_queries(error.error_type, error.message, error.component):
             hits.extend(self.github_research.search(query, limit=limit_per_query))
         dedup = {hit.url: hit for hit in hits if hit.url}
-        run.research_sources = [
-            ResearchSource(title=hit.title, url=hit.url, source_type=hit.source_type)
-            for hit in dedup.values()
-        ]
+        run.research_sources = [ResearchSource(title=hit.title, url=hit.url, source_type=hit.source_type) for hit in dedup.values()]
         proposals = generate_candidates(error.error_type, error.message, dedup.values(), limit=candidate_limit)
         candidates = [
             CandidateResult(
@@ -77,6 +71,12 @@ class SimulationRepairEngine:
         run.phase, run.progress_percent = "candidate_generation", 40
         run.updated_at = utc_now()
         return candidates
+
+    def research_and_generate(self, error: ErrorEvent, *, max_sources: int = 16, max_proposals: int = 8) -> ResearchPipelineResult:
+        """Run multi-source research plus optional structured code generation."""
+        if self.research_pipeline is None:
+            raise RuntimeError("No ResearchPipeline configured")
+        return self.research_pipeline.run(error, max_sources=max_sources, max_proposals=max_proposals)
 
     def evaluate(self, run_id: str, error: ErrorEvent, candidates: Iterable[CandidateResult]) -> SimulationRun:
         run = self._get(run_id)
