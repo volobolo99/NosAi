@@ -16,29 +16,29 @@ rl = [
 ]
 vision = [
   "mss>=10,<11",
-  "opencv-python>=4.10,<5",
+  "opencv-python>=4.10,<6",
 ]
 ocr = [
   "pytesseract>=0.3.13,<1",
 ]
 test = [
   "pytest>=9.0.3,<10",
-  "pytest-cov>=6,<7",
+  "pytest-cov>=6,<8",
   "torch>=2.0",
   "numpy>=1.26,<3",
   "fastapi>=0.115,<1",
   "httpx>=0.27,<1",
-  "opencv-python>=4.10,<5",
+  "opencv-python>=4.10,<6",
 ]
 dev = [
   "pytest>=9.0.3,<10",
-  "pytest-cov>=6,<7",
+  "pytest-cov>=6,<8",
   "ruff>=0.6,<1",
   "torch>=2.0",
   "numpy>=1.26,<3",
   "fastapi>=0.115,<1",
   "httpx>=0.27,<1",
-  "opencv-python>=4.10,<5",
+  "opencv-python>=4.10,<6",
 ]
 dashboard = [
   "fastapi>=0.115,<1",
