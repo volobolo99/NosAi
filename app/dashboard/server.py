@@ -18,12 +18,13 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.11")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.12")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 ASSET_ROOT = WEB_ROOT / "assets"
 _runtime_adapter: Any | None = None
 _previous_frame_png: bytes | None = None
+_last_autoset: dict[str, Any] | None = None
 app.mount("/assets", StaticFiles(directory=ASSET_ROOT), name="dashboard-assets")
 
 
@@ -111,6 +112,7 @@ def test_center_data() -> dict[str, Any]:
         data["gates"]["G6"] = coverage["status"]
     data["security"] = security
     data["sbom"] = sbom
+    data["autoset"] = _last_autoset
     return data
 
 
@@ -130,6 +132,24 @@ def ai_lab_data() -> dict[str, Any]:
         "scenario_errors": errors,
         "evidence": None,
     }
+
+
+@app.post("/api/autoset")
+def run_autoset() -> dict[str, Any]:
+    """Detect hardware, run deterministic benchmark, and apply process-local settings."""
+    global _last_autoset
+    try:
+        from app.autoset import autoset
+        _last_autoset = autoset(benchmark=True)
+        return _last_autoset
+    except Exception as exc:
+        _last_autoset = {"status": "FAIL", "error": f"{type(exc).__name__}: {exc}"}
+        return _last_autoset
+
+
+@app.get("/api/autoset")
+def autoset_status() -> dict[str, Any]:
+    return _last_autoset or {"status": "NOT_RUN"}
 
 
 @app.get("/api/stato")
@@ -184,27 +204,12 @@ def character_view() -> StreamingResponse:
     try:
         from app.client.live_character_view import build_character_view
         from app.client.windows_perception import WindowsNosTalePerception
-
         frame = WindowsNosTalePerception(_runtime_adapter).capture()
         view = build_character_view(frame.png, _previous_frame_png)
         _previous_frame_png = frame.png
-        return StreamingResponse(
-            BytesIO(view.png),
-            media_type="image/png",
-            headers={
-                "Cache-Control": "no-store",
-                "X-NosAi-Activity": view.activity_state,
-                "X-NosAi-Activity-Score": str(view.activity_score),
-                "X-NosAi-Observation-Only": "true",
-            },
-        )
+        return StreamingResponse(BytesIO(view.png), media_type="image/png", headers={"Cache-Control": "no-store", "X-NosAi-Activity": view.activity_state, "X-NosAi-Activity-Score": str(view.activity_score), "X-NosAi-Observation-Only": "true"})
     except Exception as exc:
-        return StreamingResponse(
-            BytesIO(b""),
-            media_type="image/png",
-            status_code=503,
-            headers={"X-NosAi-Error": f"{type(exc).__name__}: {exc}"},
-        )
+        return StreamingResponse(BytesIO(b""), media_type="image/png", status_code=503, headers={"X-NosAi-Error": f"{type(exc).__name__}: {exc}"})
 
 
 @app.get("/api/character-state")
@@ -217,14 +222,7 @@ def character_state() -> dict[str, Any]:
         from app.client.windows_perception import WindowsNosTalePerception
         frame = WindowsNosTalePerception(_runtime_adapter).capture()
         view = build_character_view(frame.png, _previous_frame_png)
-        return {
-            "available": True,
-            "observation_only": True,
-            "activity": view.activity_state,
-            "activity_score": view.activity_score,
-            "ability": None,
-            "ability_source": "not_observed",
-        }
+        return {"available": True, "observation_only": True, "activity": view.activity_state, "activity_score": view.activity_score, "ability": None, "ability_source": "not_observed"}
     except Exception as exc:
         return {"available": False, "observation_only": True, "activity": "ERROR", "ability": None, "reason": str(exc)}
 
