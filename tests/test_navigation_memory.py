@@ -5,7 +5,7 @@ from app.client.multi_entity import MinimapObservation
 
 def test_navigation_proposal_is_replayable_and_observation_only():
     bridge = NavigationMemoryBridge()
-    minimap = MinimapObservation(detections=(), width=64, height=64)
+    minimap = MinimapObservation(x=0, y=0, detections=(), width=64, height=64)
     plan = bridge.propose(
         minimap,
         GridPoint(0, 0),
