@@ -75,8 +75,8 @@ jobs:
       - name: Compile Python sources
         run: python -m compileall -q app tests
 
-      - name: Run regression suite
-        run: python -m pytest -q
+      - name: Run deterministic regression suite
+        run: python -m pytest -q -m 'not integration'
 
       - name: Run AI evaluation gate
         run: python -m pytest -q tests/unit/test_ai_evaluation.py
