@@ -1,8 +1,7 @@
 """Windows/NosTale observation-only smoke harness.
 
 This module deliberately does not inject input, access process memory, or issue
-client commands. It captures a configured window region and feeds frames to the
-existing perception adapter when available.
+client commands. It captures screen frames only.
 """
 from __future__ import annotations
 
@@ -15,24 +14,28 @@ from typing import Any
 
 class WindowsObservationHarness:
     def __init__(self, output_dir: Path, interval_s: float = 0.2) -> None:
-        self.output_dir = output_dir
+        if interval_s <= 0:
+            raise ValueError("interval_s must be positive")
+        self.output_dir = Path(output_dir)
         self.interval_s = interval_s
         self.output_dir.mkdir(parents=True, exist_ok=True)
 
-    def capture_once(self) -> Path:
+    def capture_once(self, frame_number: int = 1) -> Path:
         try:
             from PIL import ImageGrab
         except ImportError as exc:
             raise RuntimeError("Install Pillow on Windows to capture observations") from exc
         image = ImageGrab.grab()
-        target = self.output_dir / "frame_0001.png"
+        target = self.output_dir / f"frame_{frame_number:04d}.png"
         image.save(target)
         return target
 
     def run(self, frames: int = 10) -> dict[str, Any]:
+        if frames < 1 or frames > 300:
+            raise ValueError("frames must be between 1 and 300")
         captured = []
         for index in range(frames):
-            path = self.capture_once()
+            path = self.capture_once(index + 1)
             captured.append({"frame": index + 1, "path": str(path), "observation_only": True})
             if index + 1 < frames:
                 time.sleep(self.interval_s)
@@ -49,7 +52,11 @@ def main() -> None:
     args = parser.parse_args()
     if args.frames < 1 or args.frames > 300:
         parser.error("--frames must be between 1 and 300")
-    print(json.dumps(WindowsObservationHarness(Path(args.output), args.interval).run(args.frames), indent=2))
+    try:
+        report = WindowsObservationHarness(Path(args.output), args.interval).run(args.frames)
+    except (RuntimeError, ValueError) as exc:
+        parser.error(str(exc))
+    print(json.dumps(report, indent=2))
 
 
 if __name__ == "__main__":
