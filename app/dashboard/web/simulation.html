@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="it">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>NosAi — Simulation & Repair</title>
+<style>body{font-family:system-ui,sans-serif;margin:0;background:#0f172a;color:#e2e8f0}main{max-width:1200px;margin:auto;padding:24px}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.card{background:#1e293b;border:1px solid #334155;border-radius:12px;padding:16px}.wide{grid-column:1/-1}.muted{color:#94a3b8}.bar{height:10px;background:#334155;border-radius:8px;overflow:hidden}.fill{height:100%;background:#38bdf8;width:0}.row{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid #334155}button{background:#38bdf8;border:0;border-radius:8px;padding:10px 14px;cursor:pointer;font-weight:700}code{font-family:ui-monospace,monospace}</style></head>
+<body><main>
+<h1>Simulation & Repair</h1><p class="muted">Ambiente interno di ricerca e simulazione. Nessuna modifica al codice viene applicata automaticamente.</p>
+<section class="grid"><div class="card"><div class="muted">RUN</div><strong id="run">—</strong></div><div class="card"><div class="muted">STATO</div><strong id="status">IDLE</strong></div><div class="card"><div class="muted">FASE</div><strong id="phase">—</strong></div><div class="card"><div class="muted">CANDIDATI</div><strong id="candidates">0</strong></div>
+<div class="card wide"><div class="row"><strong>Progressione</strong><span id="progress">0%</span></div><div class="bar"><div class="fill" id="fill"></div></div></div>
+<div class="card wide"><h2>Risultati candidati</h2><div id="candidate-list"><span class="muted">Nessuna simulazione disponibile.</span></div></div>
+<div class="card wide"><h2>Fonti di ricerca</h2><div id="sources"><span class="muted">Nessuna fonte associata.</span></div></div>
+</section></main>
+<script>
+async function refresh(){try{const r=await fetch('/api/simulation');const d=await r.json();const x=d.latest||{};document.querySelector('#run').textContent=x.run_id||'—';document.querySelector('#status').textContent=x.status||'IDLE';document.querySelector('#phase').textContent=x.phase||'—';document.querySelector('#progress').textContent=(x.progress_percent??0)+'%';document.querySelector('#fill').style.width=(x.progress_percent??0)+'%';document.querySelector('#candidates').textContent=(x.candidates||[]).length;document.querySelector('#candidate-list').innerHTML=(x.candidates||[]).map(c=>`<div class="row"><span><strong>${esc(c.candidate_id)}</strong> — ${esc(c.description)}</span><span>${esc(c.status)}</span></div>`).join('')||'<span class="muted">Nessuna simulazione disponibile.</span>';document.querySelector('#sources').innerHTML=(x.research_sources||[]).map(s=>`<div class="row"><span>${esc(s.title)}</span><span>${esc(s.source_type)}</span></div>`).join('')||'<span class="muted">Nessuna fonte associata.</span>'}catch(e){document.querySelector('#status').textContent='UNAVAILABLE'}}
+function esc(v){return String(v??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]))}refresh();setInterval(refresh,2000);
+</script></body></html>
