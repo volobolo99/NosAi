@@ -4,7 +4,15 @@ from app.simulation_repair.research import ResearchHit, build_research_queries
 
 def test_build_research_queries_is_bounded_and_deterministic():
     queries = build_research_queries("TimeoutError", "socket timeout", "client")
-    assert queries == ["TimeoutError socket timeout", "TimeoutError client", '"socket timeout" TimeoutError']
+    assert queries == [
+        "TimeoutError socket timeout",
+        "TimeoutError client",
+        '"socket timeout" TimeoutError',
+        "TimeoutError Python fix",
+        "TimeoutError Windows Python",
+        "client TimeoutError regression",
+    ]
+    assert len(queries) == 6
 
 
 def test_candidate_generation_keeps_source_provenance():
