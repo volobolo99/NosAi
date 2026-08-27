@@ -1,0 +1,73 @@
+name: Test Center 144 + Client Adapter
+
+on:
+  push:
+    branches: [main, 'chore/**', 'feature/**', 'feat/**', 'fix/**', 'audit/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: test-center-144-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test-center:
+    name: 144-case AI + adapter integration gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+          cache: pip
+
+      - name: Install deterministic test environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install 'pytest>=8,<9' 'numpy>=1.26,<3'
+          python -m pip install 'torch==2.8.0' --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install -e . --no-deps
+          python -m pip check
+
+      - name: Compile source and test tree
+        run: python -m compileall -q app tests
+
+      - name: Run Test Center 144 + adapter gate
+        run: |
+          python -m pytest -q tests/integration/test_test_center_144_adapter.py \
+            --junitxml=test-center-144.xml
+
+      - name: Publish deterministic gate summary
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '## NosAi Test Center 144 + Adapter' >> "$GITHUB_STEP_SUMMARY"
+          echo '' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Matrix: exactly 144 scenarios' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Runtime adapter: contract + read-only/dry-run' >> "$GITHUB_STEP_SUMMARY"
+          echo '- Real game execution: disabled' >> "$GITHUB_STEP_SUMMARY"
+          if test -f test-center-144.xml; then
+            echo '- JUnit report: generated' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo '- JUnit report: not generated' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload JUnit report
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: nosai-test-center-144
+          path: test-center-144.xml
+          if-no-files-found: warn
+          retention-days: 14
