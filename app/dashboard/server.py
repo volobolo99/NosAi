@@ -18,23 +18,20 @@ try:
 except ImportError as exc:  # pragma: no cover
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.9")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.10")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 ASSET_ROOT = WEB_ROOT / "assets"
 _runtime_adapter: Any | None = None
-
 app.mount("/assets", StaticFiles(directory=ASSET_ROOT), name="dashboard-assets")
 
 
 def set_runtime_adapter(adapter: Any | None) -> None:
-    """Attach the observation-only runtime/client adapter."""
     global _runtime_adapter
     _runtime_adapter = adapter
 
 
 def configure_nostale_observation() -> str:
-    """Attach the real Windows NosTale observer when explicitly enabled."""
     global _runtime_adapter
     enabled = os.getenv("NOSAI_NOSTALE_OBSERVATION", "1").strip().lower()
     if enabled in {"0", "false", "no", "off"}:
@@ -117,9 +114,7 @@ def test_center_data() -> dict[str, Any]:
 
 @app.get("/api/ai-lab")
 def ai_lab_data() -> dict[str, Any]:
-    """Return deterministic evaluation metadata without invoking an external model."""
     from app.ai_lab.scenarios import default_scenarios, validate_scenarios
-
     scenarios = default_scenarios()
     errors = validate_scenarios(scenarios)
     return {
@@ -129,12 +124,7 @@ def ai_lab_data() -> dict[str, Any]:
         "scenarios": len(scenarios),
         "candidates": 0,
         "results": {"PASS": 0, "FAIL": 0, "NOT_RUN": len(scenarios)},
-        "metrics": {
-            "accuracy_percent": None,
-            "safety_violation_percent": None,
-            "p50_latency_ms": None,
-            "p95_latency_ms": None,
-        },
+        "metrics": {"accuracy_percent": None, "safety_violation_percent": None, "p50_latency_ms": None, "p95_latency_ms": None},
         "scenario_errors": errors,
         "evidence": None,
     }
@@ -143,40 +133,39 @@ def ai_lab_data() -> dict[str, Any]:
 @app.get("/api/stato")
 def stato() -> dict[str, Any]:
     if _runtime_adapter is None:
-        return {
-            "connected": False,
-            "stato": "pronto",
-            "modalita": "sola osservazione",
-            "connessione": "in attesa",
-            "adapter": "nostale_windows" if os.name == "nt" else "non-windows",
-        }
+        return {"connected": False, "stato": "pronto", "modalita": "sola osservazione", "connessione": "in attesa", "adapter": "nostale_windows" if os.name == "nt" else "non-windows"}
     from .state import snapshot_from_adapter
     return snapshot_from_adapter(_runtime_adapter).to_dict()
 
 
+@app.get("/api/live-observation")
+def live_observation() -> dict[str, Any]:
+    """Return one fresh real-client frame observation, never an action."""
+    if _runtime_adapter is None:
+        return {"available": False, "observation_only": True, "reason": "runtime adapter unavailable"}
+    try:
+        from app.client.live_observation import LiveObservation
+        world, _ = LiveObservation(_runtime_adapter).capture()
+        world["available"] = True
+        return world
+    except Exception as exc:
+        return {"available": False, "observation_only": True, "reason": f"{type(exc).__name__}: {exc}"}
+
+
 @app.get("/api/perception")
 def perception() -> dict[str, Any]:
-    """Return metadata proving whether real visual perception is available."""
     if _runtime_adapter is None:
         return {"available": False, "reason": "runtime adapter unavailable"}
     try:
         from app.client.windows_perception import WindowsNosTalePerception
         frame = WindowsNosTalePerception(_runtime_adapter).capture()
-        return {
-            "available": True,
-            "width": frame.width,
-            "height": frame.height,
-            "source": frame.source,
-            "observation_only": frame.observation_only,
-            "screenshot_url": "/api/screenshot",
-        }
+        return {"available": True, "width": frame.width, "height": frame.height, "source": frame.source, "observation_only": frame.observation_only, "screenshot_url": "/api/screenshot"}
     except Exception as exc:
         return {"available": False, "reason": str(exc)}
 
 
 @app.get("/api/screenshot")
 def screenshot() -> StreamingResponse:
-    """Stream a fresh screenshot of the visible NosTale window, read-only."""
     if _runtime_adapter is None:
         return StreamingResponse(BytesIO(b""), media_type="image/png", status_code=503)
     from app.client.windows_perception import WindowsNosTalePerception
