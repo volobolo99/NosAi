@@ -1,0 +1,55 @@
+name: M2 simulation gate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [develop/nosai-next]
+    paths:
+      - 'app/simulation_repair/**'
+      - 'tests/unit/**'
+      - '.github/workflows/m2-simulation-gate.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'app/simulation_repair/**'
+      - 'tests/unit/**'
+      - '.github/workflows/m2-simulation-gate.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  simulation-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install package
+        run: python -m pip install -e . --no-deps
+      - name: Run simulation safety tests
+        run: python -m pytest tests/unit/test_candidate_validation_fail_closed.py tests/unit/test_windows_evidence.py -q
+
+  windows-sandbox:
+    if: ${{ vars.NOSAI_WINDOWS_SANDBOX_ENABLED == 'true' }}
+    runs-on: [self-hosted, windows, nosai-sandbox]
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Install package
+        shell: pwsh
+        run: python -m pip install -e . --no-deps
+      - name: Validate Windows sandbox prerequisites
+        shell: pwsh
+        run: |
+          $wsb = Get-Command wsb -ErrorAction SilentlyContinue
+          if (-not $wsb) { throw 'wsb CLI not available on the NosAi Windows sandbox runner' }
+          Write-Host "Windows Sandbox CLI: $($wsb.Source)"
+      - name: Run Windows sandbox integration suite
+        shell: pwsh
+        run: python -m pytest tests/integration/test_windows_sandbox_runtime.py -q
