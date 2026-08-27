@@ -16,9 +16,9 @@ jobs:
     timeout-minutes: 20
     steps:
       - name: Checkout
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Frogbot Scan and Fix
-        uses: jfrog/frogbot@5d9c42c30f1169d8be4ba5510b40e75ffcbbc2a9 # v2.21.2
+        uses: jfrog/frogbot@7d2603d053b111cb5c2470ea89bd5bb14154fa79 # v3.5.0
         env:
           JF_URL: ${{ secrets.JF_URL }}
           JF_ACCESS_TOKEN: ${{ secrets.JF_ACCESS_TOKEN }}
