@@ -1,0 +1,28 @@
+# NosAi Local Secondary AI — architecture-level configuration
+# Concrete model/backend selection will be added after the local AI design phase.
+local_ai:
+  enabled: false
+  role: secondary
+  mode: local_only
+  backend: auto
+  model: auto
+  routing:
+    primary_first: true
+    fallback_to_local: false
+    parallel_consultation: false
+    confidence_gate: true
+  resource_policy:
+    respect_autoset: true
+    respect_benchmark: true
+    max_cpu_percent: auto
+    max_gpu_percent: auto
+    max_vram_mb: auto
+    max_ram_mb: auto
+  health:
+    startup_probe: true
+    periodic_probe_seconds: 30
+  observability:
+    expose_status_to_dashboard: true
+    expose_model_to_dashboard: true
+    expose_latency_to_dashboard: true
+    expose_resource_usage: true
