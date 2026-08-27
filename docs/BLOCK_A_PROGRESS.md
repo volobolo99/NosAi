@@ -1,26 +1,38 @@
-# Block A progress — Entity Tracking + HUD/OCR
+# Block A progress — Runtime + Perception + World Model
 
-## Completed in this increment
+## Architecture decision
 
-- Added temporal `EntityTracker` with configurable distance association.
-- Added stable IDs for detections across consecutive observations.
-- Added missed-tick bookkeeping and active-entity retention policy.
-- Added `HudValue` and confidence-aware `HudStateExtractor`.
-- Normalized common HUD aliases (`health/hp`, `mana/mp`, `lv/level`, `gold`).
-- Added numeric normalization for OCR values and provenance/confidence retention.
-- Integrated tracker and HUD extractor into `ObservationMapper`.
-- Added regression tests for stable IDs, far-away detections and HUD confidence gates.
+The optimal implementation order is:
 
-## Design constraint
+1. canonical WorldState;
+2. observation runtime pipeline;
+3. temporal entity tracking;
+4. confidence-aware HUD/OCR normalization;
+5. minimap-to-world coordinate calibration;
+6. end-to-end deterministic tests;
+7. full CI validation;
+8. real Windows/NosTale observation-only validation.
 
-All components remain observation-only. They consume detections/OCR values and
-produce structured state; they do not send input, manipulate client memory, or
-execute game actions.
+This ordering makes every later subsystem consume one canonical temporal world representation instead of maintaining parallel state.
 
-## Next engineering gate
+## Completed
 
-The next implementation step is to make the temporal tracker consume/retain
-unmatched entities according to expiry semantics, then integrate actual HUD/OCR
-producers and minimap/world-coordinate calibration into the same observation
-pipeline. After that, run the full CI suite and validate the complete chain on
-Windows with a real client in observation-only mode.
+- Hardened WorldState/EntityState contracts.
+- Implemented deterministic WorldModel transitions.
+- Added ObservationMapper and ObservationPipeline.
+- Added stable temporal entity tracking with short-occlusion retention and expiry.
+- Added confidence-gated HUD/OCR state extraction and provenance.
+- Added minimap-to-world coordinate mapper with scale, origin, rotation and confidence.
+- Added focused regression tests for all new components.
+
+## Safety boundary
+
+Block A remains observation-only: no input injection, client memory manipulation,
+or game-action execution is introduced by these components.
+
+## Final gate
+
+The remaining work is integration with the repository's real HUD/OCR and minimap
+producers, deterministic end-to-end coverage, full CI, then Windows real-client
+observation validation. No claim of production readiness should be made before
+those gates pass.
