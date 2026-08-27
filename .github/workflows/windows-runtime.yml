@@ -1,0 +1,53 @@
+name: Windows Runtime Validation
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'pyproject.toml'
+      - '.github/workflows/windows-runtime.yml'
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    name: Windows Python runtime smoke test
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install package
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e '.[dev]'
+      - name: Compile source tree
+        shell: pwsh
+        run: python -m compileall -q app tests scripts
+      - name: Import critical modules
+        shell: pwsh
+        run: |
+          python -c "import app; import app.launcher; import app.dashboard.server; print('critical imports: OK')"
+      - name: CLI smoke tests
+        shell: pwsh
+        run: |
+          nosai-preflight --help
+          nosai-client-probe --help
+          nosai-diagnostics --help
+          nosai-dashboard --help
+      - name: Windows regression tests
+        shell: pwsh
+        run: python -m pytest -q
