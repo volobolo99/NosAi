@@ -1,64 +1,71 @@
-"""Small, deterministic episodic memory with bounded retention.
+"""Small local-first stores with deterministic JSON persistence.
 
-The store is intentionally independent from RL frameworks and client I/O.
-It can be replaced by a vector/database backend later without changing the
-cognitive contracts.
+The stores deliberately expose interfaces that can later be backed by SQLite,
+a vector index, or another provider without changing NosAI contracts.
 """
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterable, List, Sequence
+import json
+from dataclasses import asdict
+from pathlib import Path
+from typing import Iterable
 
-from app.ai.contracts import MemoryRecord
-
-
-@dataclass(frozen=True)
-class MemoryQuery:
-    state_fingerprint: str | None = None
-    goal_kind: str | None = None
-    limit: int = 10
+from .models import MemoryItem, StateRecord, MemoryScope, MemoryType
 
 
-class EpisodicMemory:
-    """Bounded append-oriented memory with deterministic retrieval."""
+class MemoryStore:
+    def __init__(self, path: str | Path):
+        self.path = Path(path)
 
-    def __init__(self, capacity: int = 10_000):
-        if capacity < 1:
-            raise ValueError("capacity must be positive")
-        self._capacity = capacity
-        self._records: List[MemoryRecord] = []
+    def put(self, item: MemoryItem) -> None:
+        records = {entry.id: entry for entry in self.list()}
+        records[item.id] = item
+        self._write(records.values())
 
-    @property
-    def capacity(self) -> int:
-        return self._capacity
+    def get(self, item_id: str) -> MemoryItem | None:
+        return next((item for item in self.list() if item.id == item_id), None)
 
-    def __len__(self) -> int:
-        return len(self._records)
+    def list(self, *, scope: MemoryScope | None = None, memory_type: MemoryType | None = None) -> list[MemoryItem]:
+        if not self.path.exists():
+            return []
+        raw = json.loads(self.path.read_text(encoding="utf-8"))
+        return [
+            MemoryItem(
+                id=row["id"], memory_type=MemoryType(row["memory_type"]),
+                scope=MemoryScope(row["scope"]), content=row["content"],
+                created_at=row["created_at"], updated_at=row["updated_at"],
+                provenance=tuple(row.get("provenance", ())), confidence=row.get("confidence", 1.0),
+                metadata=row.get("metadata", {}),
+            )
+            for row in raw
+            if (scope is None or row["scope"] == scope.value)
+            and (memory_type is None or row["memory_type"] == memory_type.value)
+        ]
 
-    def append(self, record: MemoryRecord) -> None:
-        if not isinstance(record, MemoryRecord):
-            raise TypeError("record must be a MemoryRecord")
-        self._records.append(record)
-        overflow = len(self._records) - self._capacity
-        if overflow > 0:
-            del self._records[:overflow]
+    def _write(self, items: Iterable[MemoryItem]) -> None:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        payload = [asdict(item) for item in sorted(items, key=lambda x: x.id)]
+        self.path.write_text(json.dumps(payload, sort_keys=True, ensure_ascii=False, default=lambda x: x.value), encoding="utf-8")
 
-    def extend(self, records: Iterable[MemoryRecord]) -> None:
-        for record in records:
-            self.append(record)
 
-    def query(self, query: MemoryQuery) -> Sequence[MemoryRecord]:
-        if query.limit < 1:
-            return ()
-        matches = self._records
-        if query.state_fingerprint is not None:
-            matches = [r for r in matches if r.state_fingerprint == query.state_fingerprint]
-        if query.goal_kind is not None:
-            matches = [r for r in matches if r.goal.kind == query.goal_kind]
-        return tuple(matches[-query.limit:][::-1])
+class StateStore:
+    def __init__(self, path: str | Path):
+        self.path = Path(path)
 
-    def recent(self, limit: int = 10) -> Sequence[MemoryRecord]:
-        return self.query(MemoryQuery(limit=limit))
+    def save(self, state: StateRecord) -> None:
+        records = {entry.run_id: entry for entry in self.list()}
+        previous = records.get(state.run_id)
+        if previous is not None and state.version < previous.version:
+            raise ValueError("state version cannot move backwards")
+        records[state.run_id] = state
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        payload = [asdict(entry) for entry in sorted(records.values(), key=lambda x: x.run_id)]
+        self.path.write_text(json.dumps(payload, sort_keys=True, ensure_ascii=False), encoding="utf-8")
 
-    def clear(self) -> None:
-        self._records.clear()
+    def load(self, run_id: str) -> StateRecord | None:
+        return next((entry for entry in self.list() if entry.run_id == run_id), None)
+
+    def list(self) -> list[StateRecord]:
+        if not self.path.exists():
+            return []
+        return [StateRecord(**row) for row in json.loads(self.path.read_text(encoding="utf-8"))]
