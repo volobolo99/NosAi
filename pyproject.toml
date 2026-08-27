@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nos-ai-project"
-version = "4.21.0"
+version = "4.19.2"
 description = "NosAi full-runtime fusion project"
 requires-python = ">=3.10"
 
