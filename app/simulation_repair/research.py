@@ -142,7 +142,7 @@ class MultiSourceResearchProvider:
         return hits
 
 
-def build_research_queries(error_type: str, message: str, component: str = "", *, limit: int = 6) -> list[str]:
+def build_research_queries(error_type: str, message: str, component: str = "", *, limit: int = 3) -> list[str]:
     """Build bounded, reproducible search queries from an error event."""
     parts = [p.strip() for p in (error_type, message, component) if p and p.strip()]
     if not parts:
