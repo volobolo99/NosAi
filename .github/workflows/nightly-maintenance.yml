@@ -1,0 +1,37 @@
+name: Nightly Maintenance
+
+on:
+  schedule:
+    - cron: '30 2 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    name: Nightly full health check
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Install complete test environment
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -e '.[dev,test,vision,ocr,rl]'
+      - name: Dependency integrity
+        run: python -m pip check
+      - name: Compile everything
+        run: python -m compileall -q app tests
+      - name: Full regression suite
+        run: python -m pytest -q --maxfail=1
+      - name: AI evaluation suite
+        run: python -m pytest -q tests/unit/test_ai_evaluation.py
+      - name: Benchmark suite
+        run: python -m pytest -q tests/test_hardware_benchmark.py tests/benchmark
