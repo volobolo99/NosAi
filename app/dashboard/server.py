@@ -15,10 +15,10 @@ try:
     from fastapi import FastAPI, WebSocket, WebSocketDisconnect
     from fastapi.responses import FileResponse, StreamingResponse
     from fastapi.staticfiles import StaticFiles
-except ImportError as exc:  # pragma: no cover
+except ImportError as exc:
     raise RuntimeError("Installa l'extra 'dashboard' per avviare NosAi Dashboard") from exc
 
-app = FastAPI(title="NosAi — Centro di controllo", version="1.12")
+app = FastAPI(title="NosAi — Centro di controllo", version="1.13")
 bus = DashboardEventBus()
 WEB_ROOT = Path(__file__).with_name("web")
 ASSET_ROOT = WEB_ROOT / "assets"
@@ -121,22 +121,29 @@ def ai_lab_data() -> dict[str, Any]:
     from app.ai_lab.scenarios import default_scenarios, validate_scenarios
     scenarios = default_scenarios()
     errors = validate_scenarios(scenarios)
-    return {
-        "status": "READY" if not errors else "INVALID",
-        "mode": "offline-deterministic",
-        "external_provider": "NOT_REQUIRED",
-        "scenarios": len(scenarios),
-        "candidates": 0,
-        "results": {"PASS": 0, "FAIL": 0, "NOT_RUN": len(scenarios)},
-        "metrics": {"accuracy_percent": None, "safety_violation_percent": None, "p50_latency_ms": None, "p95_latency_ms": None},
-        "scenario_errors": errors,
-        "evidence": None,
-    }
+    return {"status": "READY" if not errors else "INVALID", "mode": "offline-deterministic", "external_provider": "NOT_REQUIRED", "scenarios": len(scenarios), "candidates": 0, "results": {"PASS": 0, "FAIL": 0, "NOT_RUN": len(scenarios)}, "metrics": {"accuracy_percent": None, "safety_violation_percent": None, "p50_latency_ms": None, "p95_latency_ms": None}, "scenario_errors": errors, "evidence": None}
+
+
+@app.get("/api/progression-advisor")
+def progression_advisor() -> dict[str, Any]:
+    """Return an advisory-only GuardAi progression report from supplied or safe demo state."""
+    from time import time
+    from app.progression import CharacterSnapshot, ProgressionAdvisor, ProgressionPlan, ProgressionSimulator
+    snapshot = CharacterSnapshot(snapshot_id="dashboard", timestamp=time(), confidence=0.0, provenance="dashboard:no-live-snapshot")
+    plans = (
+        ProgressionPlan("baseline", "Percorso in-game conservativo", ("analyze", "farm", "upgrade"), 1.0, 3600.0, 0.0, 0.15),
+        ProgressionPlan("efficient", "Percorso in-game orientato all'efficienza", ("analyze", "farm", "upgrade"), 1.15, 3000.0, 0.0, 0.22),
+        ProgressionPlan("policy-blocked", "Scenario esterno non autorizzato", (), 2.0, 1200.0, 0.0, 0.05, policy_status="BLOCKED"),
+    )
+    report = ProgressionAdvisor(ProgressionSimulator(simulations=128)).evaluate(snapshot, "next progression objective", plans)
+    payload = ProgressionAdvisor.dashboard_payload(report)
+    payload["source_status"] = "NO_LIVE_CHARACTER_SNAPSHOT"
+    payload["observation_only"] = True
+    return payload
 
 
 @app.post("/api/autoset")
 def run_autoset() -> dict[str, Any]:
-    """Detect hardware, run deterministic benchmark, and apply process-local settings."""
     global _last_autoset
     try:
         from app.autoset import autoset
@@ -162,7 +169,6 @@ def stato() -> dict[str, Any]:
 
 @app.get("/api/live-observation")
 def live_observation() -> dict[str, Any]:
-    """Return one fresh real-client frame observation, never an action."""
     if _runtime_adapter is None:
         return {"available": False, "observation_only": True, "reason": "runtime adapter unavailable"}
     try:
@@ -197,7 +203,6 @@ def screenshot() -> StreamingResponse:
 
 @app.get("/api/character-view")
 def character_view() -> StreamingResponse:
-    """Return a transparent RGBA subject view plus visual activity headers."""
     global _previous_frame_png
     if _runtime_adapter is None:
         return StreamingResponse(BytesIO(b""), media_type="image/png", status_code=503)
@@ -214,7 +219,6 @@ def character_view() -> StreamingResponse:
 
 @app.get("/api/character-state")
 def character_state() -> dict[str, Any]:
-    """Return dashboard-safe visual state; skill names are only reported when observed."""
     if _runtime_adapter is None:
         return {"available": False, "observation_only": True, "activity": "OFFLINE", "ability": None}
     try:
