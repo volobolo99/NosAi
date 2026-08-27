@@ -17,14 +17,14 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: pip
       - name: Install deterministic security environment
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip setuptools wheel
-          python -m pip install 'pytest>=8,<9' 'ruff>=0.6,<1' 'fastapi>=0.115,<1' 'httpx>=0.27,<1' 'numpy>=1.26,<3' pip-audit
-          python -m pip install 'torch==2.8.0' --index-url https://download.pytorch.org/whl/cpu
+          python -m pip install 'pytest>=8,<9' 'ruff>=0.6,<1' 'fastapi>=0.115,<1' 'httpx>=0.27,<1' 'numpy>=1.26,<3' 'pip-audit>=2.10,<3'
+          python -m pip install 'torch==2.9.1' --index-url https://download.pytorch.org/whl/cpu
           python -m pip install -e . --no-deps
       - name: Dependency integrity
         id: pip-check
@@ -61,6 +61,7 @@ jobs:
           sbom_exit = int(os.environ.get('SBOM_EXIT', '1'))
           evidence = {'schema': 1, 'status': 'PASS' if pip_check == 'success' and audit_exit == 0 and parse_ok and not vulns and sbom_exists and sbom_exit == 0 else 'FAIL', 'pip_check': pip_check, 'audit_exit': audit_exit, 'sbom_exit': sbom_exit, 'vulnerability_count': len(vulns), 'vulnerabilities': vulns, 'sbom': {'status': 'PASS' if sbom_exists and sbom_exit == 0 else 'FAIL', 'format': 'CycloneDX JSON'}}
           Path('security-evidence.json').write_text(json.dumps(evidence, indent=2, sort_keys=True), encoding='utf-8')
+          print(json.dumps(evidence, indent=2, sort_keys=True))
           PY
         env:
           PIP_CHECK_OUTCOME: ${{ steps.pip-check.outcome }}
