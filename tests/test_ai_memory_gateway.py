@@ -1,4 +1,4 @@
-import pytest
+import asyncio
 
 from app.ai.contracts import ActionIntent, ActionKind, Decision
 from app.ai.gateway import AIGateway
@@ -15,16 +15,14 @@ class FailingProvider:
         raise RuntimeError("provider unavailable")
 
 
-@pytest.mark.asyncio
-async def test_gateway_uses_provider():
-    result = await AIGateway(Provider(), Provider()).decide({})
+def test_gateway_uses_provider():
+    result = asyncio.run(AIGateway(Provider(), Provider()).decide({}))
     assert result.fallback_used is False
     assert result.decision.selected.kind is ActionKind.WAIT
 
 
-@pytest.mark.asyncio
-async def test_gateway_fails_over_to_deterministic_provider():
-    result = await AIGateway(FailingProvider(), Provider()).decide({})
+def test_gateway_fails_over_to_deterministic_provider():
+    result = asyncio.run(AIGateway(FailingProvider(), Provider()).decide({}))
     assert result.fallback_used is True
 
 
