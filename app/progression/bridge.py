@@ -1,15 +1,10 @@
-"""Bridge between PlayAi goal proposals and GuardAi evaluation.
-
-The bridge is deliberately side-effect free: it converts a read-only world/character
-snapshot into candidate plans and asks GuardAi to rank them. Execution is outside
-this module and remains behind the existing execution/safety gates.
-"""
+"""Bridge between PlayAi goal proposals and GuardAi evaluation."""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import Any, Iterable
 
-from .advisor import GuardAiProgressionAdvisor
+from .advisor import ProgressionAdvisor, AdvisorReport
 from .models import CharacterSnapshot, ProgressionPlan
 
 
@@ -21,19 +16,28 @@ class PlayAiProposal:
 
 
 class PlayAiGuardAiBridge:
-    """Cooperative proposal/evaluation boundary for the two AIs."""
+    """Side-effect-free PlayAi proposal -> GuardAi supervisory boundary."""
 
-    def __init__(self, advisor: GuardAiProgressionAdvisor | None = None) -> None:
-        self.advisor = advisor or GuardAiProgressionAdvisor()
+    def __init__(self, advisor: ProgressionAdvisor | None = None) -> None:
+        self.advisor = advisor or ProgressionAdvisor()
 
     def evaluate(self, snapshot: CharacterSnapshot, proposal: PlayAiProposal) -> dict[str, Any]:
-        result = self.advisor.evaluate(snapshot, proposal.plans)
+        errors = snapshot.validate()
+        if errors:
+            return {
+                "producer": "PlayAi", "supervisor": "GuardAi",
+                "objective": proposal.objective,
+                "evaluation": None,
+                "status": "BLOCKED",
+                "validation_errors": list(errors),
+                "execution_authorized": False,
+            }
+        report: AdvisorReport = self.advisor.evaluate(snapshot, proposal.objective, proposal.plans)
         return {
-            "producer": "PlayAi",
-            "supervisor": "GuardAi",
+            "producer": "PlayAi", "supervisor": "GuardAi",
             "objective": proposal.objective,
             "proposal_rationale": proposal.rationale,
-            "evaluation": result,
+            "evaluation": self.advisor.dashboard_payload(report),
             "execution_authorized": False,
         }
 
