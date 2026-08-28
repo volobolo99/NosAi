@@ -6,6 +6,7 @@ import android.util.AttributeSet
 import android.view.*
 import com.playai.guardai.telemetry.PerceptionFrame
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 
 enum class MissionSolverMode { FAST, SMART, DEEP, LOW_RES }
 
@@ -16,6 +17,7 @@ open class TelemetryOverlayView @JvmOverloads constructor(
     private var renderThread: Thread? = null
     protected val telemetryBuffer = ConcurrentHashMap<Long, PerceptionFrame>()
     @Volatile var currentVideoPTS: Long = 0L
+    protected val ptsToleranceUs: Long = 5_000L
 
     private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.STROKE; strokeWidth = 5f }
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.GREEN; textSize = 36f }
@@ -32,6 +34,19 @@ open class TelemetryOverlayView @JvmOverloads constructor(
     }
 
     fun onVideoFramePresented(ptsUs: Long) { currentVideoPTS = ptsUs }
+
+    protected fun findClosestTelemetry(videoPtsUs: Long): PerceptionFrame? {
+        var best: PerceptionFrame? = null
+        var bestSkew = Long.MAX_VALUE
+        for ((pts, frame) in telemetryBuffer) {
+            val skew = abs(pts - videoPtsUs)
+            if (skew < bestSkew) {
+                bestSkew = skew
+                best = frame
+            }
+        }
+        return best?.takeIf { bestSkew <= ptsToleranceUs }
+    }
 
     override fun surfaceCreated(holder: SurfaceHolder) {
         isRunning = true
@@ -50,7 +65,7 @@ open class TelemetryOverlayView @JvmOverloads constructor(
             val canvas = try { holder.lockCanvas() } catch (_: Exception) { null }
             if (canvas != null) try {
                 canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
-                val frame = telemetryBuffer[currentVideoPTS]
+                val frame = findClosestTelemetry(currentVideoPTS)
                 if (frame == null) {
                     canvas.drawText("SYNC ENGINE: WAITING FOR PTS MATCH...", 40f, 60f, textPaint)
                 } else {
