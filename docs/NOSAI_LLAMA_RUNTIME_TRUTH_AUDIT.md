@@ -17,7 +17,7 @@ On `develop/nosai-next`, `app/llm/llama_cpp.py` currently defines:
 - Chat endpoint: `<base_url>/v1/chat/completions`
 - Decision output: the provider maps the server response into the shared `Decision` contract.
 
-The provider is proposal-only. It does not execute game actions. Invalid/unavailable responses are converted into a `REJECTED` decision with zero confidence. fileciteturn118file0L1-L2
+The provider is proposal-only. It does not execute game actions. Invalid/unavailable responses are converted into a `REJECTED` decision with zero confidence.
 
 ## Important discrepancy found
 
@@ -27,9 +27,9 @@ The current source instead uses the generic model identifier `local`, 15 seconds
 
 ## Contract boundary
 
-The shared contracts define `DecisionProvider.decide(state, goal) -> Decision`, and `Decision` requires a valid status, confidence range, provider and optional action. fileciteturn119file0L1-L2
+The shared contracts define `DecisionProvider.decide(state, goal) -> Decision`, and `Decision` requires a valid status, confidence range, provider and optional action.
 
-The repository also contains a dedicated `nosai/runtime/` package with runtime components including the orchestrator, safety gate, sandbox, adapter, observation and telemetry modules. Therefore the earlier statement that `nosai/runtime/` was absent is not repository-truth. fileciteturn124file0L1-L2
+The repository also contains a dedicated `nosai/runtime/` package with runtime components including the orchestrator, safety gate, sandbox, adapter, observation and telemetry modules. Therefore the earlier statement that `nosai/runtime/` was absent is not repository-truth.
 
 ## Decision for the next gate
 
