@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 class GuardAiActivity : Activity(), TelemetryOverlayViewWithGesture.TouchInteractionListener, WebRtcSignalingClient.Callback {
@@ -52,7 +53,10 @@ class GuardAiActivity : Activity(), TelemetryOverlayViewWithGesture.TouchInterac
         batchStore = TelemetryBatchStore(GuardAiDatabase.get(this).telemetryDao())
         initializeWebRtc()
         val url = intent.getStringExtra("SIGNALING_URL")
-            ?: throw IllegalStateException("SIGNALING_URL is required; refusing unsafe localhost fallback")
+        if (url.isNullOrBlank()) {
+            Toast.makeText(this, "GuardAi offline: SIGNALING_URL not configured", Toast.LENGTH_LONG).show()
+            return
+        }
         signaling = WebRtcSignalingClient(url, this)
         signaling.connect()
     }
@@ -84,7 +88,6 @@ class GuardAiActivity : Activity(), TelemetryOverlayViewWithGesture.TouchInterac
             override fun onAddTrack(receiver: RtpReceiver, mediaStreams: Array<MediaStream>) {
                 (receiver.track() as? VideoTrack)?.addSink(object : VideoSink {
                     override fun onFrame(frame: VideoFrame) {
-                        // timestampNs is the WebRTC media timestamp exposed at the Android sink.
                         overlayView.onVideoFramePresented(frame.timestampNs / 1000L)
                         videoView.onFrame(frame)
                     }
@@ -161,32 +164,25 @@ class GuardAiActivity : Activity(), TelemetryOverlayViewWithGesture.TouchInterac
     private fun sendCommand(command: ControlCommand): Boolean {
         val channel = controlChannel ?: return false
         if (channel.state() != DataChannel.State.OPEN) return false
-        val bytes = command.toByteArray()
-        return channel.send(DataChannel.Buffer(ByteBuffer.wrap(bytes), true))
+        return channel.send(DataChannel.Buffer(ByteBuffer.wrap(command.toByteArray()), true))
     }
 
-    override fun onManualRecheckRequested(
-        frameId: Long,
-        label: String,
-        xMin: Float,
-        yMin: Float,
-        xMax: Float,
-        yMax: Float
-    ) {
-        val command = ControlCommand.newBuilder()
-            .setCommandId(commandId.incrementAndGet())
-            .setManualRecheck(
-                ManualRecheck.newBuilder()
-                    .setFrameId(frameId)
-                    .setLabel(label)
-                    .setXMin(xMin)
-                    .setYMin(yMin)
-                    .setXMax(xMax)
-                    .setYMax(yMax)
-                    .build()
-            )
-            .build()
-        sendCommand(command)
+    override fun onManualRecheckRequested(frameId: Long, label: String, xMin: Float, yMin: Float, xMax: Float, yMax: Float) {
+        sendCommand(
+            ControlCommand.newBuilder()
+                .setCommandId(commandId.incrementAndGet())
+                .setManualRecheck(
+                    ManualRecheck.newBuilder()
+                        .setFrameId(frameId)
+                        .setLabel(label)
+                        .setXMin(xMin)
+                        .setYMin(yMin)
+                        .setXMax(xMax)
+                        .setYMax(yMax)
+                        .build()
+                )
+                .build()
+        )
     }
 
     override fun onMissionModeChanged(newMode: MissionSolverMode) {
@@ -196,15 +192,16 @@ class GuardAiActivity : Activity(), TelemetryOverlayViewWithGesture.TouchInterac
             MissionSolverMode.DEEP -> ControlMissionSolverMode.DEEP
             MissionSolverMode.LOW_RES -> ControlMissionSolverMode.LOW_RES
         }
-        val command = ControlCommand.newBuilder()
-            .setCommandId(commandId.incrementAndGet())
-            .setMissionModeChange(MissionModeChange.newBuilder().setMode(mode).build())
-            .build()
-        sendCommand(command)
+        sendCommand(
+            ControlCommand.newBuilder()
+                .setCommandId(commandId.incrementAndGet())
+                .setMissionModeChange(MissionModeChange.newBuilder().setMode(mode).build())
+                .build()
+        )
     }
 
     override fun onDestroy() {
-        signaling.close()
+        if (::signaling.isInitialized) signaling.close()
         telemetryChannel?.dispose()
         controlChannel?.dispose()
         peerConnection?.close()
