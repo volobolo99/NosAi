@@ -1,0 +1,33 @@
+syntax = "proto3";
+package guardai.control;
+option java_package = "com.playai.guardai.control";
+option java_multiple_files = true;
+
+message ManualRecheck {
+  uint64 frame_id = 1;
+  string label = 2;
+  float x_min = 3;
+  float y_min = 4;
+  float x_max = 5;
+  float y_max = 6;
+}
+
+enum MissionSolverMode {
+  MISSION_SOLVER_MODE_UNSPECIFIED = 0;
+  FAST = 1;
+  SMART = 2;
+  DEEP = 3;
+  LOW_RES = 4;
+}
+
+message MissionModeChange {
+  MissionSolverMode mode = 1;
+}
+
+message ControlCommand {
+  uint64 command_id = 1;
+  oneof payload {
+    ManualRecheck manual_recheck = 2;
+    MissionModeChange mission_mode_change = 3;
+  }
+}
