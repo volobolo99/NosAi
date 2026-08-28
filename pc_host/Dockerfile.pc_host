@@ -1,0 +1,18 @@
+FROM nvidia/cuda:12.2.2-runtime-ubuntu22.04 AS builder
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends python3-pip python3-dev build-essential libavdevice-dev libavfilter-dev libavformat-dev libavcodec-dev libswresample-dev libswscale-dev libopus-dev libvpx-dev pkg-config git && rm -rf /var/lib/apt/lists/*
+WORKDIR /build
+RUN printf '%s\n' 'fastapi==0.110.0' 'uvicorn==0.28.0' 'websockets==12.0' 'aiortc==1.8.0' 'duckdb==0.10.0' 'd3rlpy==2.3.0' > requirements.txt
+RUN pip3 wheel --no-cache-dir --wheel-dir /build/wheels -r requirements.txt
+
+FROM nvidia/cuda:12.2.2-runtime-ubuntu22.04
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends python3 python3-pip libavdevice58 libavfilter7 libavformat58 libavcodec58 libswresample3 libswscale5 libopus0 libvpx7 && rm -rf /var/lib/apt/lists/*
+WORKDIR /app
+COPY --from=builder /build/wheels /app/wheels
+COPY --from=builder /build/requirements.txt /app/requirements.txt
+RUN pip3 install --no-cache-dir --no-index --find-links=/app/wheels -r requirements.txt
+COPY pc_host/ /app/pc_host/
+COPY config/ /app/config/
+EXPOSE 8888 8889
+CMD ["python3", "-m", "uvicorn", "pc_host.guardai_signaling_server:app", "--host", "0.0.0.0", "--port", "8888"]
