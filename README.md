@@ -33,6 +33,14 @@ The authoritative workflow is documented in `docs/BRANCHING_AND_RELEASE_POLICY.m
 
 The repository contains an explicit source-grounded NosTale strategy layer in `app/nostale/strategy.py`, based on the attached strategy document. It turns proposed state variables and strategic rules into inspectable inputs for planning and reward shaping instead of burying assumptions inside a neural policy.
 
+## NosMate Party System
+
+The unified Pet + Partner design is now represented in the runtime under `app/party/`. The new domain model implements the uploaded **Modulo Unificato NosMate e Partner System.tex** as an engine-agnostic Python layer: Partner Trust/Affection affinity and relationship tiers, morale/trust tactical weighting, Specialist Partner cards with independent skill cooldowns, STP/LTP memory consolidation and decay, high-risk command obedience, the Partner decision-priority tree, NosMate synchronization signals, and a JSON-compatible entity snapshot.
+
+This layer is deliberately separated from the live-client/action boundary. It exposes state and decisions but does not inject input, patch memory, or execute game actions. The source document's gameplay mechanics remain hypotheses until validated against observations or authoritative references.
+
+See `docs/NOSMATE_PARTNER_SYSTEM.md` and `tests/test_nosmate_partner.py`.
+
 ## Live-client pre-flight
 
 NosAi never guesses how to attach to the game client. A real integration must provide an explicit `ClientAdapter` implementation and configure it as `module:attribute` through `NOSAI_CLIENT_ADAPTER` or `--client-adapter`.
