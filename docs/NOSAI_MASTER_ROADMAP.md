@@ -1,534 +1,370 @@
-# NosAi — Master Implementation Roadmap
+# NosAi — Master Implementation Roadmap v2.0
 
-> **Status:** canonical planning document  
-> **Date:** 2026-08-27  
-> **Scope:** complete NosAi architecture, including the permanent `PlayAi` + `GuardAi` cognitive model and the Decision Fabric control plane.
+> **Status:** canonical planning document / architecture-consolidated  
+> **Date:** 2026-08-28  
+> **Scope:** complete NosAi architecture, including PlayAi, GuardAi, Decision Fabric, GuardAi EYES OF PLAYAI, Realme X50 Pro, Mission Solver, Failure Lab, offline autonomy and governed live execution.
 
 ## 1. Mission
 
-NosAi is an AI system for playing NosTale through a controlled perception → reasoning → decision → action loop. The target architecture separates the operational agent from an independent supervisory intelligence and places both behind a governed decision/control layer.
+NosAi is an AI system for controlled game interaction through a perception → world model → reasoning → decision → authorization → action loop.
 
-- **PlayAi** — permanent identity of the primary AI. It is the operational pilot: understands the game state, plans, decides and executes actions in pursuit of goals.
-- **GuardAi** — permanent identity of the secondary AI. It is the cognitive guardian: critiques PlayAi, predicts outcomes, estimates probabilities, runs simulations, searches alternative strategies and recommends improvements.
-- **Decision Fabric** — the governed coordination/control plane between proposal, review, memory/knowledge access, arbitration, safety and execution.
+- **PlayAi** — operational pilot: interprets state, plans, decides and executes.
+- **GuardAi** — independent guardian and intelligence coprocessor: critiques, predicts, searches alternatives, researches, analyzes failures and helps train NosAi toward offline autonomy.
+- **Decision Fabric** — governed coordination plane separating proposal, review, arbitration, authorization and execution.
+- **EYES OF PLAYAI** — GuardAi live-observability layer on the dedicated Realme X50 Pro. It shows the game view plus PlayAi perception, reasoning, decision data and GuardAi analysis.
 
-The names `PlayAi` and `GuardAi` are architectural identities and must remain stable. Technical terms such as `primary` and `secondary` may be used only as implementation metadata, not as replacement identities.
+**Core rule:** PlayAi proposes what to do. GuardAi evaluates whether it is good, safe and improvable. Decision Fabric authorizes what may actually execute.
 
 ## 2. Target architecture
 
 ```text
-NosTale Client
-      ↓
-Perception / Adapter
-      ↓
-World Model + Shared Context
-      ├──────────────────────────────┐
-      ↓                              ↓
-   PlayAi                         GuardAi
-   ├─ Goals                       ├─ Critic
-   ├─ Planner                     ├─ Predictor
-   ├─ Decision Engine             ├─ Simulator
-   ├─ Action Manager              ├─ Risk Engine
-   └─ Operational Memory          └─ Strategy Search
-      │                              │
-      └──────────────┬───────────────┘
-                     ↓
-               Decision Fabric
-       ┌─────────────┼──────────────┐
-       ↓             ↓              ↓
-    Knowledge       Memory       Arbitration
-       │             │              │
-       └─────────────┼──────────────┘
-                     ↓
-                Safety Gate
-                     ↓
-               Hard Deadline
-                     ↓
-              Human Override
-                     ↓
-                  Executor
-                     ↓
-                Real Result
-                     ↓
-          Memory / Learning / Replay
+                         NosTale
+                            │
+                            ▼
+                    Capture / Adapter
+                            │
+                            ▼
+                     World Model
+                       │       │
+                 ┌─────┘       └─────┐
+                 ▼                   ▼
+              PlayAi              GuardAi
+                 │                   │
+          perception/plans      critic/predictor
+          decisions/actions     simulator/risk/search
+                 │                   │
+                 └─────────┬─────────┘
+                           ▼
+                    Decision Fabric
+              proposal → review → arbitration
+                     → authorization
+                           │
+                    ┌──────┴──────┐
+                    ▼             ▼
+                Safety Gate   Observability
+                    │             │
+                    ▼             ▼
+                 Executor      Replay/Memory
+                    │             │
+                    ▼             ▼
+                 Result ─────→ Learning
+                                  │
+                                  ▼
+                          Knowledge Promotion
+                                  │
+                                  ▼
+                         NosAi Local Capability
+
+PC video/telemetry: Game → GPU capture → encoder → WebRTC → Realme
+Control/data: PC ↔ authenticated realtime/control transport ↔ Realme/Cloud
 ```
 
-### Core rule
+### Plane separation
 
-**PlayAi answers:** “What should I do?”  
-**GuardAi answers:** “Is that actually the best/safest decision, what are the likely outcomes, and can I find something better?”
+1. **Video plane:** low-latency stream; never use the database as video transport.
+2. **Control plane:** commands, session state, health, approvals and mode changes.
+3. **Telemetry plane:** perception, decisions, metrics, events and traces.
+4. **Knowledge plane:** validated strategies, failures, predictions and provenance.
+5. **Safety plane:** authorization, deadlines, fallback and human override.
 
-GuardAi must be able to disagree with PlayAi. Agreement is an outcome, not an assumption.
+## 3. Review of uploaded GuardAi EYES OF PLAYAI v3.0
 
-## 3. Current baseline / completed foundations
+The v3.0 Master Architecture is a strong evolution: it turns the Realme from passive monitor into a tactical cockpit and adds synchronized telemetry, XAI, replay, formal mission scoring, disagreement analysis, hybrid storage and offline-learning concepts. It is now incorporated as architecture input, but **its performance figures are targets, not implementation facts**.
 
-The repository baseline already contains or documents the following foundations and they must be preserved while the new architecture is integrated:
+### Accepted
+- Realme X50 Pro dedicated GuardAi terminal.
+- EYES OF PLAYAI live view.
+- Perception / Reasoning / Decision overlays.
+- Frame-synchronized telemetry.
+- Human-in-the-loop recheck and tactical controls.
+- Replay/time-travel concept.
+- Mission Utility Score.
+- Failure clustering/root-cause analysis.
+- DuckDB/SQLite-style local analytics.
+- WebRTC + binary telemetry direction.
+- OpenTelemetry-compatible observability.
+- Progressive knowledge transfer to NosAi.
+- Offline-first design.
 
-1. Stable repository/release discipline and source-first Python runtime.
-2. NosTale strategy/state foundations, reward metadata and provenance concepts.
-3. Live-client preflight and a Windows client adapter boundary.
-4. CI, quality/security/compatibility gates and Test Center foundations.
-5. Local-AI routing/backend contract foundations.
-6. Primary/local cooperation modes, arbitration and dual-review concepts.
-7. Versioned AI message protocol with `message_id`, `correlation_id`, `context_id` and typed message kinds.
-8. Controlled shared memory with source, confidence and versioning.
-9. Benchmark/AutoSet direction for adapting local inference to the host computer.
-10. Dashboard/control-center direction, including automatic configuration.
-11. AI-lab/evaluation foundations for scenario testing and evidence.
+### Corrections now enforced by the roadmap
 
-These are foundations, not permission to bypass the gates below.
+**No unconditional “zero latency” or “<15 ms end-to-end” promise.** Capture, encode, network, decode, render and overlay each have separate budgets. We will publish measured p50/p95/p99 latency.
 
-## 4. Consolidation decisions added after architecture audit
+**PTS is an explicit synchronization contract.** We do not assume that a presentation timestamp is simply available in an H.264/H.265 NAL header. A monotonic media timestamp/sequence is generated and shared with telemetry.
 
-### 4.1 Decision Fabric
+**Protobuf is a candidate encoding, not a guaranteed payload reduction.** Any claimed reduction must come from benchmark data.
 
-Introduce a dedicated control plane that separates:
+**DataChannel reliability is message-class dependent.** High-rate perception telemetry may use unordered/unreliable delivery; commands, approvals, safety events and critical state use reliable delivery.
 
-`proposal → review → arbitration → authorization → execution`.
+**MCTS is adaptive.** A fixed “10,000 simulations/sec” is not a guaranteed capability. AutoSet chooses a measured simulation budget based on actual hardware and state complexity.
 
-PlayAi and GuardAi must not directly bypass this layer to reach the real executor.
+**TensorRT is PC-side when supported.** The Realme is not assumed to run NVIDIA TensorRT; Android handles decode/render and only assigned GuardAi workloads.
 
-### 4.2 Memory architecture
+**Storage is abstracted.** DuckDB is a host analytics candidate; SQLite/Room is an Android edge-store candidate; cloud object storage is optional. No mandatory S3 dependency is assumed.
 
-Use technology-neutral interfaces first. The implementation may use an in-memory store for hot/realtime state and a persistent/vector-capable store for semantic/strategic retrieval after benchmark validation. Do not hard-code Redis or a specific vector database before measuring the actual workload.
+**Observability uses standard trace context.** OpenTelemetry/W3C Trace Context is the baseline; B3 may be supported only for compatibility.
 
-Required logical stores:
-- hot world state;
-- episodic memory;
-- semantic knowledge;
-- strategic memory;
-- prediction memory;
-- failure memory.
+**Probabilities require calibration.** Every percentage must include sample count, confidence/calibration state, evaluation window, baseline version and GuardAi version.
 
-### 4.3 Hard deadlines
+**Mission Utility Score is versioned, not assumed optimal.** We validate weights, normalization and scoring behavior through benchmark results.
 
-GuardAi review must have an explicit deadline. A timeout must produce a deterministic, state-aware fallback rather than blocking PlayAi indefinitely. The fallback policy must be configurable and testable; examples include safe retreat, defensive action or resource preservation depending on state.
+**GuardAi cannot bypass governance.** Any correction that affects real execution passes through Decision Fabric, Safety Gate and the applicable deadline/override policy.
 
-### 4.4 Hardware capability profile
+## 4. Status model
 
-AutoSet must classify measured hardware capability instead of relying on one universal VRAM threshold. Profiles should control model choice, concurrency, simulation budget and graceful degradation. On insufficient resources GuardAi may degrade or be disabled, while PlayAi falls back to validated deterministic/heuristic behavior.
+- **DONE** — accepted foundation exists.
+- **INTEGRATE** — documented/partially present; connection required.
+- **BUILD** — implementation required.
+- **GATE** — validation required before promotion.
+- **RESEARCH** — candidate technology/algorithm awaiting benchmark evidence.
+- **TARGET** — long-term capability.
 
-### 4.5 Human Override / Kill Switch
+A design document is never counted as implementation.
 
-The dashboard must provide an immediate operator override that:
-- stops new real actions;
-- pauses agent loops safely;
-- preserves authoritative state;
-- leaves background processes recoverable;
-- allows controlled resume.
+# 5. Master phases
 
-### 4.6 Knowledge / RAG
+## Phase 0 — Governance & baseline — DONE/GATE
+Preserve stable `main`, controlled PR flow, CI, security, quality, compatibility, Test Center and source-first runtime/configuration/tests.
 
-Create a Knowledge Base abstraction and retrieval layer for stable game knowledge and approved external/documentary sources. Retrieved knowledge must retain provenance and confidence and must not silently overwrite observed world state. RAG is a context provider, not an authority that can bypass Safety Gate.
+**Exit:** reproducible baseline and green mandatory gates.
 
-### 4.7 Anti-cheat / compliance boundary
+## Phase 1 — Permanent identities & contracts — INTEGRATE
+Canonical identities: PlayAi, GuardAi, Decision Fabric, EYES OF PLAYAI. Define lifecycle, capabilities, health, messages, deadlines, correlation and telemetry.
 
-Do not add mechanisms whose purpose is to evade anti-cheat detection. Keep client integration, action transport, safety and operator override explicit and auditable. Validate compatibility and allowed usage separately from the AI reasoning layer.
+**Exit:** no ambiguous ownership of decisions.
 
-## 5. Roadmap status model
+## Phase 2 — PlayAi Core — BUILD
+Complete perception consumption, world interpretation, goals, planning, decision engine, action manager, operational memory and observe → decide → act → result.
 
-- **DONE:** foundation exists and is accepted as baseline.
-- **INTEGRATE:** foundation exists but must be connected to the new PlayAi/GuardAi architecture.
-- **TODO:** implementation required.
-- **GATE:** validation required before promotion.
+**Exit:** PlayAi produces a governed proposal from validated state.
 
-## 6. Master phases
+## Phase 3 — GuardAi Core — BUILD
+Implement Critic, Predictor, Risk Engine, Simulator, Strategy Engine, Research Engine, Failure Lab and Knowledge Promoter. GuardAi must independently challenge PlayAi.
 
-### Phase 0 — Governance & baseline — DONE
-- Maintain stable `main` and controlled development flow.
-- Preserve CI, security, quality, compatibility and Test Center gates.
-- Keep source of truth in runtime/configuration/tests.
+**Exit:** structured review with evidence.
 
-**Exit:** baseline remains reproducible and CI-green.
+## Phase 4 — Adaptive Guard Trigger — BUILD
+Review levels: FAST, LIGHT, SMART, DEEP and SAFE/SURVIVAL. Escalate on low confidence, high risk/cost, unknown state, disagreement or repeated failure.
 
-### Phase 1 — Permanent identities — TODO
-- Introduce `PlayAi` and `GuardAi` as canonical public/internal identities.
-- Define lifecycle, contracts, capabilities, events and telemetry.
-- Migrate ambiguous primary/secondary naming without breaking compatibility.
+**Exit:** compute follows risk and uncertainty.
 
-**Exit:** no architectural ambiguity about ownership of decisions.
+## Phase 5 — PlayAi ↔ GuardAi Protocol — INTEGRATE/GATE
+Canonical flow:
+`TASK → STATE SNAPSHOT → PROPOSAL → REVIEW → OPTIONAL SIMULATION → RECOMMENDATION → ARBITRATION → AUTHORIZATION → EXECUTION → RESULT → LEARNING EVENT`.
 
-### Phase 2 — PlayAi Core — TODO
-Implement:
-- perception consumer;
-- world-state interpretation;
-- goal manager;
-- planner;
-- decision engine;
-- action manager;
-- operational/episodic memory;
-- observe → decide → act → result loop.
+Every decision carries message_id, correlation_id, context_id, decision_id, protocol version, monotonic timestamp, deadline, confidence, evidence, risk and strategy version.
 
-**Exit:** PlayAi can produce a validated action proposal from a known state.
+**Exit:** every cross-agent decision is reconstructable.
 
-### Phase 3 — GuardAi Core — TODO
-Implement independently:
-- **Critic:** detects inconsistencies and weak reasoning;
-- **Predictor:** estimates success/failure/death/cost/time/reward;
-- **Simulator:** evaluates future scenarios;
-- **Risk Engine:** selects review depth;
-- **Strategy Engine:** generates and compares alternatives.
+## Phase 6 — Shared Context & Memory — INTEGRATE
+Logical stores: hot world state, episodic, semantic, strategic, prediction, failure, research cache and replay metadata. Authoritative knowledge requires provenance, confidence, version, promotion state and rollback.
 
-**Exit:** GuardAi can independently challenge a PlayAi proposal and return structured evidence.
+**Exit:** no uncontrolled memory mutation.
 
-### Phase 4 — Adaptive Guard Trigger — TODO
-Use review levels:
-- fast/no deep review for trivial actions;
-- lightweight review for ordinary actions;
-- simulation for difficult encounters;
-- mandatory review for high-risk, high-cost, unknown or low-confidence decisions;
-- escalation on disagreement.
+## Phase 7 — NosTale World Model — BUILD
+Formalize player, targets, map, movement, combat, skills/cooldowns, HP/MP, buffs/debuffs, inventory/resources, objectives, rewards and temporal state.
 
-GuardAi must not consume maximum compute on every action.
+**Exit:** machine-readable, replayable, simulation-ready state.
 
-**Exit:** review depth adapts to risk, uncertainty and available compute.
+## Phase 8 — Simulation Engine — BUILD/GATE
+Build deterministic/seeded reset/state/action/transition support for movement, combat, cooldowns, resources, time and terminal states. RL is optional and comes after simulator validation.
 
-### Phase 5 — PlayAi ↔ GuardAi Protocol — INTEGRATE
-Existing protocol concepts must become the live orchestration contract.
+**Exit:** repeatable counterfactual scenarios.
 
-Required flow:
+## Phase 9 — Prediction & Calibration — BUILD
+Return success/failure/death probability where applicable, expected time/cost/reward, confidence and calibration state. Store prediction → outcome → error and evaluate calibration continuously.
 
-```text
-TASK → PROPOSAL → REVIEW → SIMULATION → RECOMMENDATION → DECISION → RESULT
-```
+**Exit:** probabilities have measurable reliability.
 
-Required metadata:
-- `message_id`
-- `correlation_id`
-- `context_id`
-- `decision_id`
-- protocol version
-- timestamp/deadline
-- confidence
-- evidence references
-- risk level
+## Phase 10 — Mission Solver — BUILD
+**FAST:** local knowledge + validated strategies.  
+**SMART:** targeted research + limited simulation.  
+**DEEP:** broader search/simulation.  
+**LOW RES/DEGRADED:** constrained compute/network profile.
 
-**Exit:** every cross-agent decision is traceable end-to-end.
+Optimize a versioned utility model balancing success, reward, time, resources, risk and retry cost.
 
-### Phase 6 — Shared Context & Memory — INTEGRATE
-Split memory into:
-- hot world state;
-- episodic memory;
-- semantic knowledge;
-- strategic memory;
-- prediction memory;
-- failure memory.
+**Exit:** plans are comparable with measured evidence.
 
-Add provenance, confidence, versioning, conflict resolution, TTL/decay where appropriate, snapshots and rollback.
+## Phase 11 — Strategy Lab — BUILD
+Lifecycle: Observed → Candidate → Sandbox → Benchmark → A/B → Stable Candidate → Approved → Knowledge Pack. Never delete the previous best automatically.
 
-Use technology-neutral repository interfaces. Select concrete in-memory/vector/persistent backends only after workload and hardware benchmarks.
+**Exit:** improvements are measurable and reversible.
 
-**Rule:** agents propose memory changes; an authorization gate commits authoritative knowledge.
+## Phase 12 — Failure Lab — BUILD
+Record state, perception, action sequence, decision, resources, timing, threat, disagreement and outcome. Use clustering such as DBSCAN only when data volume justifies it. Generate root cause, countermeasure, candidate strategy and replay reference.
 
-**Exit:** both agents can operate on the same authoritative context without uncontrolled mutation.
+**Exit:** failures become testable knowledge.
 
-### Phase 7 — NosTale World Model — TODO
-Formalize:
-- player state;
-- targets;
-- map/location;
-- skills/cooldowns;
-- HP/MP;
-- buffs/debuffs;
-- inventory/resources;
-- combat state;
-- objectives;
-- rewards;
-- temporal context.
+## Phase 13 — Learning & Offline Autonomy — TARGET
+`Experience → Evaluation → Error Analysis → Candidate Learning → Simulation → Benchmark → Promotion → Local Knowledge`.
 
-Every derived fact should retain confidence/provenance where feasible.
+Measure Guardian Dependency Index, local decision coverage, prediction accuracy, regression rate and knowledge reuse.
 
-**Exit:** state is machine-readable, replayable and suitable for simulation.
+**Exit:** validated autonomy grows without sacrificing safety.
 
-### Phase 8 — Simulation Engine — TODO
-Build a controlled environment supporting:
-- reset/state initialization;
-- deterministic/seeded transitions;
-- actions and consequences;
-- combat;
-- movement;
-- cooldowns;
-- damage/defense/resistances;
-- resources;
-- time;
-- terminal conditions;
-- batch simulation.
+## Phase 14 — GuardAi EYES OF PLAYAI Live View — BUILD
+Realme X50 Pro becomes the dedicated tactical terminal. Display live game view, PlayAi perception, bounding boxes, confidence, player/target/objective, danger zones, predicted path, current/alternative strategies, decision, ETA, risk, disagreement, connection, latency and FPS.
 
-Design the API so it can later support RL without making RL mandatory now.
+Modes: **PLAYER VIEW** (clean) and **ENGINEER VIEW** (full diagnostic/XAI).
 
-**Exit:** GuardAi can run repeatable counterfactual scenarios from a captured state.
+**Exit:** the user can see the game through PlayAi’s operational perception.
 
-### Phase 9 — Prediction & Probability Engine — TODO
-Return structured metrics:
-- success probability;
-- failure probability;
-- death probability;
-- expected reward;
-- expected cost;
-- expected time;
-- confidence.
+## Phase 15 — Low-Latency Video Plane — RESEARCH/BUILD
+Candidate pipeline: DXGI Desktop Duplication → GPU-side processing → NVENC when available → WebRTC → Android hardware decode → overlay compositor.
 
-Record prediction vs actual outcome and calculate prediction error. Calibrate predictions over time.
+DXGI Desktop Duplication is a valid frame-by-frame desktop access mechanism with GPU-oriented processing opportunities; NVENC low-latency settings will be benchmarked, not assumed.
 
-**Exit:** probability outputs are measurable and continuously evaluated against reality.
+Measure capture, encode, network, decode, render and end-to-end p50/p95/p99.
 
-### Phase 10 — Strategy Search — TODO
-Progressive implementation:
-1. deterministic/rule-based alternatives;
-2. local/beam search;
-3. Monte Carlo;
-4. MCTS;
-5. value/policy methods if justified;
-6. self-play/RL only after simulator/reward/dataset stability.
+**Exit:** measured low-latency stream on the actual PC + Realme network path.
 
-**Exit:** GuardAi can demonstrate when an alternative strategy is statistically or empirically superior.
+## Phase 16 — Telemetry & Frame Synchronization — BUILD/GATE
+Versioned Perception Frame:
+`frame_id, media_timestamp, sequence, objects[], player_state, threat, strategy_id, decision_id, top_causal_factors[]`.
 
-### Phase 11 — Learning & self-improvement — TODO
-Pipeline:
+Transport classes: high-rate telemetry may be lossy/unordered; commands/approvals reliable; safety events reliable + acknowledged; snapshots reliable.
+
+**Exit:** overlay never silently applies telemetry to the wrong frame.
+
+## Phase 17 — XAI & Human-in-the-Loop — BUILD
+Show causal factors, threat, bottleneck, route, alternatives, confidence and expected result. Controls: recheck, mode switch, strategic waypoint, pause, resume and emergency stop. All controls pass through authorization.
+
+**Exit:** the user can understand and safely influence the system.
+
+## Phase 18 — Replay / Time-Travel Debugging — BUILD
+Bounded circular buffer, initial target 30 seconds, adaptive quality and event-triggered preservation. Synchronize video, perception, reasoning, decision, candidate strategies, disagreement and outcome.
+
+**Exit:** critical failures can be reconstructed from one timeline.
+
+## Phase 19 — Guardian Disagreement & Safety Arbitration — BUILD/GATE
+`PlayAi estimate + GuardAi estimate → confidence/risk assessment → recheck/simulation/fallback → Decision Fabric`.
+
+Do not hard-code a universal 25% disagreement threshold. Thresholds are configurable and calibrated by scenario.
+
+**Exit:** disagreement cannot silently become unsafe execution.
+
+## Phase 20 — Hybrid Storage & Cloud Bridge — INTEGRATE/RESEARCH
+PC: DuckDB candidate for analytical/replay workloads. Realme: SQLite/Room candidate for edge cache/offline operation. Cloud: Supabase/Postgres/Realtime for coordination and metadata where appropriate; object storage for larger artifacts when needed.
+
+The cloud is a bridge, not the authoritative brain.
+
+**Exit:** controlled degradation when cloud connectivity disappears.
+
+## Phase 21 — Local AI Runtime + AutoSet — INTEGRATE
+Benchmark CPU/GPU/VRAM/RAM/storage/inference/simulation/video capacity. AutoSet derives model/runtime, concurrency, context, simulation budget, GuardAi deadline, video quality and degradation policy.
+
+**Exit:** configuration is measured, not guessed.
+
+## Phase 22 — Observability — BUILD
+Use OpenTelemetry-compatible traces, metrics and logs. Track E2E p50/p95/p99, perception FPS, overlay sync errors, PlayAi/GuardAi confidence, disagreement, prediction error, strategy win rate, mission success, resource cost, timeout/fallback, human overrides, Guardian Impact Score and Guardian Dependency Index.
+
+**Exit:** decisions and performance are reconstructable.
+
+## Phase 23 — Test Center & CI — GATE
+Unit tests; protocol contracts; simulator regression; probability calibration; disagreement; timeout/fallback; memory integrity; replay determinism; overlay sync; WebRTC reconnect; Android offline; hardware benchmark regression; safety/override; full PlayAi + GuardAi integration.
+
+**Exit:** no promotion without green mandatory gates.
+
+## Phase 24 — Security, Safety & Compliance — GATE
+Rules: proposal ≠ authorization ≠ execution; GuardAi cannot bypass Safety Gate; human override wins; no uncontrolled runtime/code self-modification; secrets isolated; least privilege; auditable configuration/knowledge; no anti-cheat detection-evasion mechanisms.
+
+**Exit:** AI failure cannot directly bypass controls.
+
+## Phase 25 — Offline Validation Lab — BUILD
+Compare PlayAi only, PlayAi + GuardAi, degraded GuardAi, GuardAi-disabled fallback and strategies A/B/C. Measure success improvement, error reduction, time improvement, calibration, resource overhead and Guardian dependency.
+
+**Exit:** GuardAi is proven useful rather than merely expensive.
+
+## Phase 26 — Controlled Live Pilot — GATE
+`Build → CI → Security → Test Center → Benchmark → Dry Run → Controlled Live → Observe → Promote`.
+
+Rollback remains available at every promotion boundary.
+
+**Exit:** stable pilot on actual host + Realme.
+
+## Phase 27 — Continuous Research & Patch Intelligence — TARGET
+After relevant game updates or scheduled reviews, GuardAi detects changed behavior, invalidates affected knowledge, researches new mechanics/strategies, compares evidence, benchmarks candidates, creates Knowledge Packs and requests governed promotion.
+
+**Exit:** adaptation without destroying stable knowledge.
+
+# 6. Dependency order
 
 ```text
-Experience → Evaluation → Error Analysis → Learning → Candidate Strategy → Simulation → Benchmark → Promotion
-```
-
-Never allow unvalidated automatic code mutation in the production runtime.
-
-**Exit:** improvements are evidence-based, replayable and reversible.
-
-### Phase 12 — Local AI runtime — INTEGRATE
-- Connect the local backend/router to GuardAi and PlayAi contracts.
-- Support READY/BUSY/DEGRADED/UNAVAILABLE states.
-- Keep core interfaces vendor/model agnostic.
-- Define resource budgets and fallback behavior.
-- Enforce GuardAi hard deadlines.
-
-**Exit:** local inference participates in the same governed orchestration path.
-
-### Phase 13 — Benchmark + AutoSet — INTEGRATE
-Benchmark:
-- CPU;
-- GPU;
-- RAM/VRAM;
-- storage/latency;
-- inference throughput;
-- simulation throughput.
-
-AutoSet must derive:
-- model/runtime selection;
-- context/batch limits;
-- simulation budget;
-- concurrency;
-- degradation policy;
-- GuardAi deadline/budget.
-
-Dashboard must expose automatic configuration and benchmark results.
-
-**Exit:** NosAi adapts itself to the actual host hardware through measured data.
-
-### Phase 14 — Perception & client integration — TODO/GATE
-- Normalize observations.
-- Keep adapter and decision logic separate.
-- Preserve preflight.
-- Require valid/consistent world state before any real action.
-- Progress from observation/dry-run toward controlled execution only after all gates pass.
-- Keep compliance/anti-cheat concerns outside the reasoning engine and do not implement detection-evasion behavior.
-
-**Exit:** live action is impossible when state validation fails.
-
-### Phase 15 — Decision Fabric, Dashboard & Control Center — TODO
-Decision Fabric must expose:
-- proposal state;
-- review state;
-- arbitration;
-- authorization;
-- deadline/timeout;
-- fallback;
-- execution result;
-- audit trail.
-
-Dashboard views:
-- PlayAi status/goal/decision/confidence;
-- GuardAi risk/prediction/simulation/alternatives;
-- cooperation timeline;
-- disagreements and consensus;
-- benchmark/AutoSet;
-- memory/replay;
-- dry-run/read-only/live separation;
-- **Human Override / Kill Switch**.
-
-**Exit:** an operator can understand why a decision happened without inspecting source code and can immediately pause real actions.
-
-### Phase 16 — Test Center + CI — TODO/GATE
-Add:
-- PlayAi unit tests;
-- GuardAi unit tests;
-- protocol contract tests;
-- simulator regression tests;
-- prediction calibration tests;
-- conflict/fallback/timeout tests;
-- memory integrity tests;
-- Decision Fabric authorization tests;
-- Human Override tests;
-- performance budgets;
-- benchmark regressions;
-- integration tests for PlayAi + GuardAi.
-
-**Exit:** all mandatory gates pass before release promotion.
-
-### Phase 17 — Observability — TODO
-Metrics:
-- end-to-end latency;
-- PlayAi confidence;
-- GuardAi confidence;
-- agreement/disagreement rate;
-- simulation count/time;
-- prediction error;
-- reward;
-- survival/failure rate;
-- resource usage;
-- timeout/fallback rate;
-- human override events.
-
-All traces should correlate via `decision_id`, `correlation_id` and `context_id`.
-
-**Exit:** decisions can be reconstructed and replayed.
-
-### Phase 18 — Security & safety — TODO/GATE
-Enforce:
-- proposal ≠ authorization ≠ execution;
-- GuardAi cannot bypass Safety Gate;
-- Decision Fabric cannot bypass Human Override;
-- no uncontrolled runtime/code self-modification;
-- secret isolation;
-- least privilege for tools/adapters;
-- audit trail for configuration and memory changes.
-
-**Exit:** a model failure cannot directly bypass architectural controls.
-
-### Phase 19 — Performance & reliability — TODO
-- profile before optimizing;
-- cache repeated simulations;
-- batch where beneficial;
-- adaptive simulation budgets;
-- hard deadlines;
-- controlled degradation;
-- timeout/recovery;
-- authoritative-state persistence.
-
-**Exit:** predictable performance on the benchmarked machine.
-
-### Phase 20 — Offline Validation Lab — TODO
-Build a scenario corpus and replay system.
-
-Required comparisons:
-- PlayAi only vs PlayAi + GuardAi;
-- strategy A vs B;
-- predictor calibration;
-- resource cost vs decision quality;
-- difficult vs ordinary scenarios;
-- full GuardAi vs degraded GuardAi vs GuardAi-disabled fallback.
-
-**Exit:** measurable evidence that GuardAi improves decisions rather than merely adding latency.
-
-### Phase 21 — Release / live pilot — GATE
-Sequence:
-1. develop candidate;
-2. full CI;
-3. security/quality/compatibility;
-4. Test Center;
-5. benchmark;
-6. dry-run;
-7. controlled live pilot;
-8. observe;
-9. promote to stable;
-10. retain rollback path.
-
-**Exit:** stable release only after all gates are green.
-
-### Phase 22 — Continuous improvement — TARGET
-- GuardAi mines episodes for patterns.
-- Candidate strategies are generated.
-- Candidates are simulated and benchmarked offline.
-- Validated strategies enter strategic knowledge.
-- Prediction calibration improves over time.
-- Regressions trigger rollback.
-
-## 7. External technical inspiration
-
-Use external projects as patterns/components to evaluate, not as blind dependencies:
-
-- **OpenSpiel:** game search, MCTS, evaluation, imperfect-information/game algorithms.
-- **Gymnasium:** environment/state/action/reset/step abstractions useful for the simulation layer.
-- **PettingZoo:** multi-agent environment patterns.
-- **Microsoft Agent Framework:** modern orchestration/workflow ideas; evaluate selectively.
-- **AutoGen:** useful historical reference for multi-agent messaging, but do not make it a foundational dependency without a current technical justification.
-
-## 8. Dependency order
-
-The consolidated dependency chain is:
-
-```text
-Identity/contracts
-      ↓
-Decision Fabric contracts
-      ↓
-PlayAi + GuardAi core
-      ↓
-Protocol + Shared Context
-      ↓
+Governance
+ ↓
+Identities & Contracts
+ ↓
+Decision Fabric
+ ↓
+PlayAi / GuardAi Core
+ ↓
+Protocol
+ ↓
+Shared Context
+ ↓
 World Model
-      ↓
-Memory/Knowledge interfaces
-      ↓
+ ↓
 Simulator
-      ↓
-Predictor / Risk / Strategy Search
-      ↓
-Arbitration + Safety + Hard Deadline + Human Override
-      ↓
+ ↓
+Prediction + Mission Solver
+ ↓
+Strategy Lab + Failure Lab
+ ↓
+Safety + Arbitration + Human Override
+ ↓
 Local Runtime + AutoSet
-      ↓
-Perception / controlled execution
-      ↓
-Learning / Offline Lab
-      ↓
-Live Pilot
+ ↓
+EYES OF PLAYAI
+ ↓
+Live Video + Telemetry Sync
+ ↓
+Replay + XAI
+ ↓
+Offline Validation
+ ↓
+Controlled Live Pilot
+ ↓
+Continuous Research
 ```
 
-Do not reverse this order by adding advanced RL before the simulator and evaluation system are trustworthy.
+Advanced RL, GPU MCTS and automatic learning must not jump ahead of simulator validity, measurement and safety gates.
 
-## 9. Definition of Done for the whole project
+# 7. Quantitative improvement framework
 
-NosAi is considered mature when:
+No improvement percentage is shown without a baseline.
 
-1. PlayAi can autonomously operate the game loop.
-2. GuardAi independently evaluates and challenges PlayAi.
-3. GuardAi can simulate meaningful alternatives before high-impact decisions.
-4. Predictions are calibrated against real outcomes.
-5. Shared memory is versioned, attributable and controlled.
-6. Semantic/strategic knowledge is retrievable with provenance.
-7. Every important decision is traceable and replayable.
-8. Decision Fabric separates reasoning from authorization and execution.
-9. Safety Gate and Human Override can stop real actions safely.
-10. GuardAi has hard deadlines and deterministic fallbacks.
-11. Local inference is automatically tuned to the host machine.
-12. Dashboard exposes the complete cognitive loop.
-13. CI/Test Center/benchmark/security gates protect releases.
-14. Learning improves validated strategies without uncontrolled runtime mutation.
-15. The system degrades safely when models, resources or observations are unavailable.
+For higher-is-better metrics:
+`Improvement % = (with_guardai - baseline) / baseline × 100`.
 
-## 10. AI implementation contract
+For lower-is-better metrics, the direction is inverted.
 
-An AI implementing this roadmap must:
+Track at minimum: mission success, median/average mission time, failure rate, prediction error, resource cost, decision latency, disagreement resolution, strategy reuse and Guardian Dependency Index.
 
-- inspect the repository before modifying architecture;
-- preserve existing working functionality;
-- implement the smallest coherent gate rather than unrelated rewrites;
-- add tests with each architectural feature;
-- document new contracts;
-- never assume an external framework is required just because it was used as inspiration;
-- validate changes with CI/Test Center where available;
-- prefer deterministic, observable components for safety-critical decisions;
-- keep PlayAi and GuardAi responsibilities explicit;
-- treat Decision Fabric as the authorization/control boundary;
-- keep human override available before real execution;
-- treat this document as the master plan and update phase status after each validated gate.
+Every dashboard percentage includes sample count, calibration/confidence state, evaluation window, baseline version and GuardAi version.
+
+# 8. Definition of Done — whole NosAi
+
+NosAi is mature when:
+1. PlayAi executes the validated game loop.
+2. GuardAi independently challenges decisions.
+3. Decision Fabric governs every real action.
+4. Predictions are calibrated.
+5. Mission Solver compares alternatives.
+6. Failure Lab converts failures into validated knowledge.
+7. EYES OF PLAYAI provides synchronized live observability.
+8. Realme remains useful without cloud connectivity.
+9. NosAi reuses validated GuardAi knowledge locally.
+10. GuardAi dependency decreases over time.
+11. Patch/research cycles update knowledge safely.
+12. CI, Test Center, security and rollback gates remain green.
+
+# 9. Strategic conclusion
+
+The uploaded GuardAi v3.0 document is retained as a high-value design reference. This roadmap deliberately converts its strongest ideas into governed implementation phases and removes unsupported assumptions about latency, payload reduction, fixed MCTS throughput, timestamp placement, Android GPU capabilities and cloud storage.
+
+The strongest architectural decision is the separation of **video, telemetry, control, knowledge and safety**, combined with a governed path from PlayAi proposal to real execution.
+
+The Realme X50 Pro becomes the dedicated **Guardian Console + Eyes of PlayAi + XAI debugger + Mission monitor + Failure Lab terminal**.
+
+The long-term objective remains: **GuardAi teaches NosAi until NosAi can perform validated decisions locally; GuardAi remains the independent auditor, researcher and innovation engine rather than becoming a permanent bottleneck.**
