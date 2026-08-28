@@ -1,0 +1,15 @@
+syntax = "proto3";
+package guardai.telemetry;
+option java_package = "com.playai.guardai.telemetry";
+option java_multiple_files = true;
+
+message Vector3 { float x = 1; float y = 2; float z = 3; }
+message BoundingBox { float x_min = 1; float y_min = 2; float x_max = 3; float y_max = 4; string label = 5; float confidence = 6; }
+message PerceptionFrame {
+  uint64 frame_id = 1; uint64 presentation_timestamp_us = 2;
+  repeated BoundingBox detected_objects = 3; Vector3 player_position = 4;
+  float threat_level = 5; float disagreement_delta = 6;
+  repeated string top_3_causal_factors = 7; uint32 system_status_flags = 8;
+}
+message StrategyNode { string action_name = 1; float utility_score = 2; float visit_count = 3; float prior_probability = 4; }
+message MCTSReplayPayload { uint64 source_frame_id = 1; repeated StrategyNode explored_branches = 2; string chosen_policy_id = 3; }
