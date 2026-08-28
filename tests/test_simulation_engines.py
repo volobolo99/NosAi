@@ -41,7 +41,7 @@ def test_make_or_buy_uses_geometric_expected_attempts_and_90_percent_bound():
         "Test Sword", 0.5, 1000, 500, [Ingredient("mat", 2, 100)], 10000, 15000, 10.0
     )
     assert result.gold_expected_make == 13400
-    assert result.gold_worst_case_90 == 13400
+    assert result.gold_worst_case_90 == 16800
     assert result.verdict == "MAKE_SAFE"
 
 
