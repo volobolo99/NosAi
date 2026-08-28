@@ -16,14 +16,17 @@ class GuardAiActivity : Activity(), TelemetryOverlayViewWithGesture.TouchInterac
     private lateinit var videoView: SurfaceViewRenderer
     private lateinit var signaling: WebRtcSignalingClient
     private lateinit var batchStore: TelemetryBatchStore
+    private lateinit var eglBase: EglBase
     private var peerConnection: PeerConnection? = null
+    private var dataChannel: DataChannel? = null
     private var factory: PeerConnectionFactory? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         val root = FrameLayout(this)
-        videoView = SurfaceViewRenderer(this).apply { setZOrderOnTop(false) }
+        eglBase = EglBase.create()
+        videoView = SurfaceViewRenderer(this).apply { setZOrderOnTop(false); init(eglBase.eglBaseContext, null) }
         root.addView(videoView, FrameLayout.LayoutParams(-1, -1))
         overlayView = TelemetryOverlayViewWithGesture(this).apply { setInteractionListener(this@GuardAiActivity) }
         root.addView(overlayView, FrameLayout.LayoutParams(-1, -1))
@@ -39,34 +42,85 @@ class GuardAiActivity : Activity(), TelemetryOverlayViewWithGesture.TouchInterac
     private fun initializeWebRtc() {
         PeerConnectionFactory.initialize(PeerConnectionFactory.InitializationOptions.builder(this).createInitializationOptions())
         factory = PeerConnectionFactory.builder()
-            .setVideoDecoderFactory(DefaultVideoDecoderFactory(EglBase.create().eglBaseContext))
-            .setVideoEncoderFactory(DefaultVideoEncoderFactory(EglBase.create().eglBaseContext, true, true))
+            .setVideoDecoderFactory(DefaultVideoDecoderFactory(eglBase.eglBaseContext))
+            .setVideoEncoderFactory(DefaultVideoEncoderFactory(eglBase.eglBaseContext, true, true))
             .createPeerConnectionFactory()
-        videoView.init(EglBase.create().eglBaseContext, null)
     }
 
-    override fun onPairingApproved(capabilities: List<String>) { runOnUiThread { Toast.makeText(this, "GuardAi paired: ${capabilities.joinToString()}", Toast.LENGTH_SHORT).show() } }
-    override fun onSdpOfferReceived(sdp: String) = Unit
+    override fun onPairingApproved(capabilities: List<String>) = Unit
+
+    override fun onSdpOfferReceived(sdp: String) {
+        val iceServers = emptyList<PeerConnection.IceServer>()
+        peerConnection = factory?.createPeerConnection(iceServers, object : PeerConnection.Observer {
+            override fun onIceCandidate(candidate: IceCandidate) = signaling.sendIceCandidate(candidate.sdpMid ?: "", candidate.sdpMLineIndex, candidate.sdp)
+            override fun onDataChannel(channel: DataChannel) { attachDataChannel(channel) }
+            override fun onAddTrack(receiver: RtpReceiver, mediaStreams: Array<MediaStream>) {
+                (receiver.track() as? VideoTrack)?.addSink(videoView)
+            }
+            override fun onSignalingChange(state: PeerConnection.SignalingState) = Unit
+            override fun onIceConnectionChange(state: PeerConnection.IceConnectionState) = Unit
+            override fun onIceConnectionReceivingChange(receiving: Boolean) = Unit
+            override fun onIceGatheringChange(state: PeerConnection.IceGatheringState) = Unit
+            override fun onIceCandidatesRemoved(candidates: Array<IceCandidate>) = Unit
+            override fun onRemoveStream(stream: MediaStream) = Unit
+            override fun onRenegotiationNeeded() = Unit
+            override fun onConnectionChange(newState: PeerConnection.PeerConnectionState) = Unit
+        })
+        val desc = SessionDescription(SessionDescription.Type.OFFER, sdp)
+        peerConnection?.setRemoteDescription(object : SdpObserver {
+            override fun onSetSuccess() {
+                peerConnection?.createAnswer(object : SdpObserver {
+                    override fun onCreateSuccess(answer: SessionDescription) {
+                        peerConnection?.setLocalDescription(object : SdpObserver {
+                            override fun onSetSuccess() = signaling.sendSdpAnswer(answer.description)
+                            override fun onCreateSuccess(d: SessionDescription) = Unit
+                            override fun onCreateFailure(e: String) = Unit
+                            override fun onSetFailure(e: String) = Unit
+                        }, answer)
+                    }
+                    override fun onSetSuccess() = Unit
+                    override fun onCreateFailure(error: String) = Unit
+                    override fun onSetFailure(error: String) = Unit
+                }, MediaConstraints())
+            }
+            override fun onCreateSuccess(d: SessionDescription) = Unit
+            override fun onCreateFailure(e: String) = Unit
+            override fun onSetFailure(e: String) = Unit
+        }, desc)
+    }
+
     override fun onIceCandidateReceived(sdpMid: String, sdpMLineIndex: Int, candidate: String) {
         peerConnection?.addIceCandidate(IceCandidate(sdpMid, sdpMLineIndex, candidate))
     }
     override fun onServerDisconnected() = runOnUiThread { Toast.makeText(this, "SIGNAL LOST — OFFLINE", Toast.LENGTH_LONG).show() }
 
-    private fun consumeTelemetry(buffer: ByteArray) {
-        runCatching { PerceptionFrame.parseFrom(buffer) }.onSuccess { frame ->
-            overlayView.onTelemetryPacketReceived(frame)
-            kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { batchStore.enqueue(frame) }
-        }
+    private fun attachDataChannel(channel: DataChannel) {
+        dataChannel = channel
+        channel.registerObserver(object : DataChannel.Observer {
+            override fun onBufferedAmountChange(previousAmount: Long) = Unit
+            override fun onStateChange() = Unit
+            override fun onMessage(buffer: DataChannel.Buffer) {
+                if (!buffer.binary) return
+                val bytes = ByteArray(buffer.data.remaining()).also { buffer.data.get(it) }
+                runCatching { PerceptionFrame.parseFrom(bytes) }.onSuccess { frame ->
+                    overlayView.onTelemetryPacketReceived(frame)
+                    kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.IO).launch { batchStore.enqueue(frame) }
+                }
+            }
+        })
+    }
+
+    private fun sendCommand(type: String, payload: Map<String, Any?>) {
+        // Command envelope is deliberately kept off the high-frequency telemetry path.
+        // Concrete command protobuf transport can be attached without changing PerceptionFrame.
     }
 
     override fun onManualRecheckRequested(frameId: Long, label: String, xMin: Float, yMin: Float, xMax: Float, yMax: Float) {
-        Toast.makeText(this, "🚨 Recheck: $label", Toast.LENGTH_SHORT).show()
-        // Command transport remains on the negotiated unordered/unreliable DataChannel.
+        sendCommand("CMD_RECHECK", mapOf("frame_id" to frameId, "label" to label, "x_min" to xMin, "y_min" to yMin, "x_max" to xMax, "y_max" to yMax))
     }
-    override fun onMissionModeChanged(newMode: MissionSolverMode) {
-        Toast.makeText(this, "🧠 Modalità: ${newMode.name}", Toast.LENGTH_SHORT).show()
-    }
+    override fun onMissionModeChanged(newMode: MissionSolverMode) { sendCommand("CMD_MODE_SWITCH", mapOf("mode" to newMode.name)) }
+
     override fun onDestroy() {
-        signaling.close(); peerConnection?.close(); videoView.release(); batchStore.close(); super.onDestroy()
+        signaling.close(); dataChannel?.dispose(); peerConnection?.close(); videoView.release(); eglBase.release(); batchStore.close(); factory?.dispose(); super.onDestroy()
     }
 }
