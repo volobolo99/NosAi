@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "status": "candidate_only",
+  "policy": "Candidates require schema/capture evidence before promotion.",
+  "mappings": [
+    {"packet":"in","source_field":"VisualId","canonical_field":"entity_id","evidence":"NosCore schema reference; requires live/schema validation","verified":false},
+    {"packet":"in","source_field":"PositionX","canonical_field":"x","evidence":"NosCore schema reference; requires live/schema validation","verified":false},
+    {"packet":"in","source_field":"PositionY","canonical_field":"y","evidence":"NosCore schema reference; requires live/schema validation","verified":false},
+    {"packet":"in","source_field":"Direction","canonical_field":"direction","evidence":"NosCore schema reference; requires live/schema validation","verified":false},
+    {"packet":"in","source_field":"Hp","canonical_field":"hp_percent","evidence":"NosCore schema reference; requires live/schema validation","verified":false},
+    {"packet":"in","source_field":"Mp","canonical_field":"mp_percent","evidence":"NosCore schema reference; requires live/schema validation","verified":false}
+  ]
+}

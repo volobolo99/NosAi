@@ -1,0 +1,13 @@
+{
+  "schema_version": 1,
+  "sources": [
+    {"id": "noscore", "kind": "packet_schema", "authority": "primary", "status": "verified-reference"},
+    {"id": "nossmooth", "kind": "game_state_static_data", "authority": "secondary", "status": "reference-only"},
+    {"id": "nostale_packetlogger", "kind": "packet_capture", "authority": "secondary", "status": "reference-only"}
+  ],
+  "promotion_policy": {
+    "require_provenance": true,
+    "require_schema_validation": true,
+    "require_live_validation_for_client_semantics": true
+  }
+}
