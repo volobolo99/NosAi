@@ -10,7 +10,9 @@ import uuid
 from app.client.adapter import ClientAdapter, validate_adapter
 from app.self_repair.telemetry import TelemetryStore
 
+from .event_store import PilotEventStore
 from .models import PilotError, PilotResult, PilotSessionConfig, StateQuality
+from .telemetry_schema import PilotEventType
 
 DecisionFn = Callable[[dict[str, Any]], Any]
 
@@ -42,6 +44,7 @@ class TestPilot:
         self.config = config or PilotSessionConfig()
         self.decision_fn = decision_fn or self._baseline_decision
         self.telemetry = TelemetryStore(self.config.telemetry_path)
+        self.events = PilotEventStore(self.config.event_path)
 
     @staticmethod
     def _baseline_decision(state: dict[str, Any]) -> dict[str, Any]:
@@ -74,15 +77,9 @@ class TestPilot:
 
         if not missing:
             return StateQuality.VALID
-
-        # Missing structural perception is unsafe for an operational decision.
-        # Any missing required field therefore blocks the decision in v0.1.
         critical = {"player.position", "entities", "target"}
         if critical.intersection(missing):
             return StateQuality.UNUSABLE
-
-        # Non-structural fields are retained as degraded telemetry for future
-        # policy refinement, but are still blocked in this first safety gate.
         return StateQuality.DEGRADED
 
     def run(self) -> PilotResult:
@@ -95,19 +92,27 @@ class TestPilot:
         blocked_decisions = 0
         missing_seen: set[str] = set()
         state_quality_counts = {quality.value: 0 for quality in StateQuality}
+        self.events.record(PilotEventType.SESSION_STARTED, session_id, payload={
+            "mode": self.config.mode.value,
+            "ticks": self.config.ticks,
+        })
 
         if not self.adapter.check_connection():
-            errors.append(
-                PilotError(
-                    "C001", "client", "critical", "client adapter is not connected", False
-                )
-            )
+            error = PilotError("C001", "client", "critical", "client adapter is not connected", False)
+            errors.append(error)
+            self.events.record(PilotEventType.ERROR, session_id, payload={
+                "error_id": error.error_id, "component": error.component,
+                "severity": error.severity, "message": error.message,
+            })
+            self.events.record(PilotEventType.SESSION_FINISHED, session_id, payload={
+                "status": "ERROR", "ticks": 0, "decisions": 0,
+            })
             return PilotResult(
                 session_id, self.config.mode, 0, 0, 0, 0, state_quality_counts,
                 tuple(errors), (), None
             )
 
-        for _ in range(self.config.ticks):
+        for tick_index in range(self.config.ticks):
             cycle_id = self.telemetry.start_cycle(
                 "test_pilot", {"session_id": session_id, "mode": self.config.mode.value}
             )
@@ -120,38 +125,46 @@ class TestPilot:
                 missing_seen.update(missing)
                 quality = self._state_quality(missing, self.config.required_capabilities)
                 state_quality_counts[quality.value] += 1
+                self.events.record(
+                    PilotEventType.STATE_OBSERVED,
+                    session_id,
+                    tick=tick_index,
+                    state_quality=quality.value,
+                    payload={"missing_capabilities": list(missing)},
+                )
 
                 if missing:
                     severity = "error" if quality is StateQuality.UNUSABLE else "warning"
                     error = PilotError(
-                        "P001",
-                        "perception",
-                        severity,
-                        "required state capabilities are missing",
-                        True,
-                        {
-                            "missing_capabilities": missing,
-                            "state_quality": quality.value,
-                            "tick": state.tick,
-                        },
+                        "P001", "perception", severity,
+                        "required state capabilities are missing", True,
+                        {"missing_capabilities": missing, "state_quality": quality.value, "tick": state.tick},
                     )
                     errors.append(error)
                     tick_errors.append(error.error_id)
+                    self.events.record(
+                        PilotEventType.ERROR,
+                        session_id,
+                        tick=tick_index,
+                        state_quality=quality.value,
+                        payload={"error_id": error.error_id, **error.metadata},
+                    )
 
                 if quality is not StateQuality.VALID:
                     blocked_decisions += 1
+                    self.events.record(
+                        PilotEventType.DECISION_BLOCKED,
+                        session_id,
+                        tick=tick_index,
+                        state_quality=quality.value,
+                        payload={"reason": "state_quality", "missing_capabilities": list(missing)},
+                    )
                     self.telemetry.finish_cycle(
-                        cycle_id,
-                        "test_pilot",
-                        "BLOCKED",
+                        cycle_id, "test_pilot", "BLOCKED",
                         (perf_counter() - started) * 1000.0,
                         {"state_quality": quality.value, "decision_blocked": True},
                         tuple(tick_errors),
-                        {
-                            "session_id": session_id,
-                            "mode": self.config.mode.value,
-                            "missing_capabilities": missing,
-                        },
+                        {"session_id": session_id, "mode": self.config.mode.value, "missing_capabilities": missing},
                     )
                     continue
 
@@ -160,65 +173,67 @@ class TestPilot:
                 latency_ms = (perf_counter() - decision_started) * 1000.0
                 latencies.append(latency_ms)
                 decisions += 1
+                self.events.record(
+                    PilotEventType.DECISION_PROPOSED,
+                    session_id,
+                    tick=tick_index,
+                    state_quality=quality.value,
+                    payload={"action": action, "latency_ms": latency_ms},
+                )
 
                 valid = self.adapter.validate_action(action)
+                self.events.record(
+                    PilotEventType.ACTION_VALIDATED,
+                    session_id,
+                    tick=tick_index,
+                    state_quality=quality.value,
+                    payload={"valid": valid, "action": action},
+                )
                 if valid:
                     valid_decisions += 1
                 else:
                     error = PilotError(
-                        "A001",
-                        "action",
-                        "error",
-                        "adapter rejected proposed action",
-                        True,
+                        "A001", "action", "error", "adapter rejected proposed action", True,
                         {"action": action, "tick": state.tick},
                     )
                     errors.append(error)
                     tick_errors.append(error.error_id)
+                    self.events.record(PilotEventType.ERROR, session_id, tick=tick_index, payload={
+                        "error_id": error.error_id, **error.metadata,
+                    })
 
                 self.telemetry.finish_cycle(
-                    cycle_id,
-                    "test_pilot",
-                    "OK" if not tick_errors else "DEGRADED",
+                    cycle_id, "test_pilot", "OK" if not tick_errors else "DEGRADED",
                     (perf_counter() - started) * 1000.0,
-                    {
-                        "state_quality": quality.value,
-                        "tick": state.tick,
-                        "decision_latency_ms": latency_ms,
-                        "action_valid": valid,
-                        "decision_blocked": False,
-                    },
+                    {"state_quality": quality.value, "tick": state.tick,
+                     "decision_latency_ms": latency_ms, "action_valid": valid,
+                     "decision_blocked": False},
                     tuple(tick_errors),
                     {"session_id": session_id, "action": action, "mode": self.config.mode.value},
                 )
             except Exception as exc:  # noqa: BLE001 - pilot must capture runtime failures
-                error = PilotError(
-                    "C004",
-                    "client",
-                    "error",
-                    f"pilot cycle failed: {exc}",
-                    True,
-                    {"cycle_id": cycle_id},
-                )
+                error = PilotError("C004", "client", "error", f"pilot cycle failed: {exc}", True,
+                                   {"cycle_id": cycle_id, "tick": tick_index})
                 errors.append(error)
+                self.events.record(PilotEventType.ERROR, session_id, tick=tick_index, payload={
+                    "error_id": error.error_id, **error.metadata, "message": error.message,
+                })
                 self.telemetry.finish_cycle(
-                    cycle_id,
-                    "test_pilot",
-                    "ERROR",
-                    (perf_counter() - started) * 1000.0,
-                    error_ids=(error.error_id,),
-                    metadata={"session_id": session_id},
+                    cycle_id, "test_pilot", "ERROR", (perf_counter() - started) * 1000.0,
+                    error_ids=(error.error_id,), metadata={"session_id": session_id},
                 )
 
+        self.events.record(PilotEventType.SESSION_FINISHED, session_id, payload={
+            "status": "OK" if not errors else "DEGRADED",
+            "ticks": self.config.ticks,
+            "decisions": decisions,
+            "blocked_decisions": blocked_decisions,
+            "valid_decisions": valid_decisions,
+        })
         return PilotResult(
-            session_id=session_id,
-            mode=self.config.mode,
-            ticks=self.config.ticks,
-            decisions=decisions,
-            valid_decisions=valid_decisions,
-            blocked_decisions=blocked_decisions,
-            state_quality_counts=state_quality_counts,
-            errors=tuple(errors),
-            missing_capabilities=tuple(sorted(missing_seen)),
+            session_id=session_id, mode=self.config.mode, ticks=self.config.ticks,
+            decisions=decisions, valid_decisions=valid_decisions,
+            blocked_decisions=blocked_decisions, state_quality_counts=state_quality_counts,
+            errors=tuple(errors), missing_capabilities=tuple(sorted(missing_seen)),
             avg_decision_latency_ms=(sum(latencies) / len(latencies)) if latencies else None,
         )
